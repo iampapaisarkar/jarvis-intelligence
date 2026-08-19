@@ -1,10 +1,10 @@
 # Jarvis
 
-Local, offline personal voice assistant. The AI brain runs on a Windows laptop (CPU-only). A Mac client (later phases) executes macOS actions over the local network.
+Local, offline personal voice assistant. The AI brain runs on a Windows laptop (CPU-only). A Mac client executes macOS actions over the local network.
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 6** — local LLM + STT + TTS + intent + safety + Windows/posix tools.
+Current milestone: **Phase 7** — local LLM + STT + TTS + intent + safety + Windows/posix tools + Mac WebSocket body.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
@@ -241,7 +241,7 @@ curl -X POST http://127.0.0.1:8765/v1/intent `
   -d "{\"text\":\"VS Code ta open kore dao.\",\"target\":\"windows\"}"
 ```
 
-`target: mac` is deferred until Phase 7. Medium/high actions still need confirmation. Blocked actions return `denied`. After confirm, Windows/posix tools may set `executed: true`.
+`target: mac` is sent to the Mac client over WebSocket. If no client is connected, the reply is `deferred_mac`. Medium/high actions still need confirmation. Blocked actions return `denied`. After confirm, Windows/posix tools may set `executed: true`.
 
 Confirm a pending action (same `session_id`):
 
@@ -292,21 +292,30 @@ python -m uvicorn server.main:app --host 127.0.0.1 --port 8765
 python -m pytest tests -q
 ```
 
+On the Mac body (same machine for development, or another Mac on the LAN against the Windows brain):
+
+```bash
+python -m mac_client --url ws://127.0.0.1:8765/v1/mac --token change-me
+```
+
+Use the Windows LAN IP instead of `127.0.0.1` when the brain is a separate laptop. The client re-checks tools and paths locally; it does not blindly execute network payloads.
+
 ---
 
-## API (Phase 6)
+## API (Phase 7)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | LLM + STT + TTS + tool + safety state |
+| GET | `/health` | no | LLM + STT + TTS + tool + safety + Mac client state |
 | POST | `/v1/chat` | token | Local chat completion |
 | POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
 | POST | `/v1/listen` | token | Microphone capture → transcript |
 | POST | `/v1/speak` | token | Text → WAV (Piper / espeak-ng) |
-| POST | `/v1/intent` | token | Text → gated tool plan; executes local tools when allowed |
+| POST | `/v1/intent` | token | Text → gated tool plan; executes local or Mac tools when allowed |
 | GET | `/v1/tools` | token | Registered tool schemas |
 | GET | `/v1/pending` | token | Pending confirmation for a session |
 | POST | `/v1/confirm` | token | Approve or reject a pending action |
+| WS | `/v1/mac` | token | Mac body: hello, tool_request / tool_result |
 
 `POST /v1/chat` body:
 
@@ -329,13 +338,14 @@ Header: `X-Jarvis-Token: <JARVIS_AUTH_TOKEN>` or `Authorization: Bearer <token>`
 ## Project layout
 
 ```
-server/     Phase 1 FastAPI brain
-models/     Local model files (not in git)
-scripts/    Windows setup / start / health
-tests/      Unit + integration tests
+server/       FastAPI brain
+mac_client/   macOS body (WebSocket)
+models/       Local model files (not in git)
+scripts/      Windows setup / start / health
+tests/        Unit + integration tests
 ```
 
-STT, TTS, intent, safety, and local Windows/posix tools are implemented. Mac client and memory are documented in ARCHITECTURE.md.
+STT, TTS, intent, safety, local Windows/posix tools, and the Mac WebSocket client are implemented. Memory is documented in ARCHITECTURE.md.
 
 ---
 

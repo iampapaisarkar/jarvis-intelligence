@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     jarvis_tools_backend: str = "auto"
     jarvis_workspace: Optional[Path] = None
     jarvis_terminal_timeout_seconds: int = 10
+    jarvis_mac_timeout_seconds: int = 20
 
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
@@ -144,6 +145,13 @@ class Settings(BaseSettings):
     def _term_timeout(cls, value: int) -> int:
         if value < 1 or value > 60:
             raise ValueError("JARVIS_TERMINAL_TIMEOUT_SECONDS must be between 1 and 60")
+        return value
+
+    @field_validator("jarvis_mac_timeout_seconds")
+    @classmethod
+    def _mac_timeout(cls, value: int) -> int:
+        if value < 3 or value > 120:
+            raise ValueError("JARVIS_MAC_TIMEOUT_SECONDS must be between 3 and 120")
         return value
 
     def resolve_path(self, path: Path) -> Path:

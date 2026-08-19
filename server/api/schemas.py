@@ -28,6 +28,12 @@ class SafetyHealth(BaseModel):
     confirmation_ttl_seconds: int
 
 
+class MacHealth(BaseModel):
+    connected: bool = False
+    hostname: Optional[str] = None
+    version: Optional[str] = None
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     version: str
@@ -37,6 +43,7 @@ class HealthResponse(BaseModel):
     tts: ModelHealth
     tools: ToolsHealth
     safety: SafetyHealth
+    mac: MacHealth = Field(default_factory=MacHealth)
 
 
 class ChatMessage(BaseModel):

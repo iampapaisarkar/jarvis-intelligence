@@ -67,6 +67,18 @@ def test_mac_target_is_deferred():
     assert result.reason == "deferred_mac"
 
 
+def test_mac_target_force_local_runs(app_launcher):
+    executor = LocalToolExecutor(get_settings(), launch=app_launcher, force_local=True)
+    result = executor.run(
+        default_registry().require("open_application"),
+        target="mac",
+        arguments={"application": "Visual Studio Code"},
+    )
+    assert result.executed is True
+    assert app_launcher.calls
+    assert "Visual Studio Code" in app_launcher.calls[0]
+
+
 def test_open_application_uses_launcher(app_launcher):
     executor = LocalToolExecutor(get_settings(), launch=app_launcher)
     result = executor.run(

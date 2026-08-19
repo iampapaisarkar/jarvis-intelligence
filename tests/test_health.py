@@ -11,6 +11,7 @@ def test_health_ok_when_model_file_present(client, fake_llm, fake_stt, fake_tts)
     assert body["tools"]["registered"] == 7
     assert body["tools"]["execution"] == "posix"
     assert body["safety"]["policy"] == "local"
+    assert body["mac"]["connected"] is False
     assert body["version"]
 
 

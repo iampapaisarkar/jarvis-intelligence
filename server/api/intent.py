@@ -19,10 +19,12 @@ from server.config import Settings, get_settings
 from server.dependencies import (
     get_confirmation_store,
     get_intent_parser,
+    get_mac_bridge,
     get_safety_engine,
     get_tool_executor,
     get_tool_registry,
 )
+from server.mac.bridge import MacBridge
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import GatedIntent, SafetyEngine
 from server.safety.phrases import classify_confirmation
@@ -140,6 +142,7 @@ async def confirm_action(
     engine: SafetyEngine = Depends(get_safety_engine),
     registry: ToolRegistry = Depends(get_tool_registry),
     executor: LocalToolExecutor = Depends(get_tool_executor),
+    bridge: MacBridge = Depends(get_mac_bridge),
 ) -> IntentResponse:
     pending = store.get(body.session_id, body.confirmation_id)
     if pending is None:
@@ -163,7 +166,14 @@ async def confirm_action(
             status_code=status.HTTP_410_GONE,
             detail="That confirmation expired. Please ask again.",
         )
-    return _response(apply_execution(engine.approve(popped, session_id=body.session_id), registry=registry, executor=executor))
+    return _response(
+        await apply_execution(
+            engine.approve(popped, session_id=body.session_id),
+            registry=registry,
+            executor=executor,
+            bridge=bridge,
+        )
+    )
 
 
 @router.post(
@@ -178,6 +188,7 @@ async def parse_intent(
     store: ConfirmationStore = Depends(get_confirmation_store),
     registry: ToolRegistry = Depends(get_tool_registry),
     executor: LocalToolExecutor = Depends(get_tool_executor),
+    bridge: MacBridge = Depends(get_mac_bridge),
 ) -> IntentResponse:
     session_id = body.session_id or str(uuid.uuid4())
     logger.info(
@@ -186,7 +197,9 @@ async def parse_intent(
         body.target,
         extra={"session_id": session_id},
     )
-    handled = _handle_spoken_confirmation(body.text, session_id, store, engine, registry, executor)
+    handled = await _handle_spoken_confirmation(
+        body.text, session_id, store, engine, registry, executor, bridge
+    )
     if handled is not None:
         return handled
 
@@ -195,16 +208,24 @@ async def parse_intent(
         session_id=session_id,
         default_target=body.target,
     )
-    return _response(apply_execution(engine.gate(parsed), registry=registry, executor=executor))
+    return _response(
+        await apply_execution(
+            engine.gate(parsed),
+            registry=registry,
+            executor=executor,
+            bridge=bridge,
+        )
+    )
 
 
-def _handle_spoken_confirmation(
+async def _handle_spoken_confirmation(
     text: str,
     session_id: str,
     store: ConfirmationStore,
     engine: SafetyEngine,
     registry: ToolRegistry,
     executor: LocalToolExecutor,
+    bridge: MacBridge,
 ) -> IntentResponse | None:
     verdict = classify_confirmation(text)
     pending = store.get_for_session(session_id)
@@ -214,7 +235,14 @@ def _handle_spoken_confirmation(
         popped = store.pop(session_id, pending.confirmation_id)
         if popped is None:
             return _cancelled(session_id, "That confirmation expired. Please ask again.")
-        return _response(apply_execution(engine.approve(popped, session_id=session_id), registry=registry, executor=executor))
+        return _response(
+            await apply_execution(
+                engine.approve(popped, session_id=session_id),
+                registry=registry,
+                executor=executor,
+                bridge=bridge,
+            )
+        )
     if verdict == "no":
         if pending is not None:
             store.cancel_session(session_id)

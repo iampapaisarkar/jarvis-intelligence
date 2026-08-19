@@ -6,7 +6,6 @@ import os
 import platform
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -36,9 +35,16 @@ class ToolResult:
 
 
 class LocalToolExecutor:
-    def __init__(self, settings: Settings, *, launch: Optional[LaunchFn] = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        launch: Optional[LaunchFn] = None,
+        force_local: bool = False,
+    ) -> None:
         self._settings = settings
         self._launch = launch
+        self._force_local = force_local
 
     @property
     def backend(self) -> str:
@@ -60,7 +66,7 @@ class LocalToolExecutor:
                 spoken=_planned(spec, target, arguments),
                 reason="tools_disabled",
             )
-        if target == "mac":
+        if target == "mac" and not self._force_local:
             return ToolResult(
                 ok=True,
                 executed=False,
@@ -208,21 +214,37 @@ def detect_backend(settings: Settings) -> str:
     return "off"
 
 
-def apply_execution(
+async def apply_execution(
     gated: GatedIntent,
     *,
     registry: ToolRegistry,
     executor: LocalToolExecutor,
+    bridge: Any = None,
 ) -> GatedIntent:
     if gated.type != "tool_call" or gated.safety != "allowed" or not gated.tool or not gated.target:
         return gated
     spec = registry.require(gated.tool)
-    result = executor.run(
-        spec,
-        target=gated.target,
-        arguments=gated.arguments_or_empty,
-        session_id=gated.session_id,
-    )
+    if gated.target == "mac":
+        if bridge is None:
+            result = ToolResult(
+                ok=True,
+                executed=False,
+                spoken="I'll do that on the Mac once the client is connected.",
+                reason="deferred_mac",
+            )
+        else:
+            result = await bridge.run_tool(
+                spec,
+                arguments=gated.arguments_or_empty,
+                session_id=gated.session_id,
+            )
+    else:
+        result = executor.run(
+            spec,
+            target=gated.target,
+            arguments=gated.arguments_or_empty,
+            session_id=gated.session_id,
+        )
     return GatedIntent(
         type=gated.type,
         safety=gated.safety,

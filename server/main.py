@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from server import __version__
 from server.api.health import router as health_router
 from server.api.intent import router as intent_router
+from server.api.mac import router as mac_router
 from server.api.routes import router as chat_router
 from server.api.speech import router as speech_router
 from server.api.tts import router as tts_router
@@ -31,7 +32,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     tts = get_tts_engine()
     registry = get_tool_registry()
     logger.info(
-        "Jarvis Phase 6 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s",
+        "Jarvis Phase 7 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s",
         settings.jarvis_host,
         settings.jarvis_port,
         settings.model_file,
@@ -64,7 +65,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Jarvis",
-        description="Local offline personal assistant brain (Phase 6: LLM + STT + TTS + intent + safety + tools)",
+        description="Local offline personal assistant brain (Phase 7: LLM + STT + TTS + intent + safety + tools + Mac client)",
         version=__version__,
         lifespan=lifespan,
         docs_url="/docs",
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
     application.include_router(speech_router)
     application.include_router(tts_router)
     application.include_router(intent_router)
+    application.include_router(mac_router)
 
     @application.exception_handler(LLMError)
     async def llm_error_handler(_request, exc: LLMError) -> JSONResponse:

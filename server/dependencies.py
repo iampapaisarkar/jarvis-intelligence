@@ -11,6 +11,7 @@ from server.ai.tts import PiperTTS, TextToSpeech
 from server.config import Settings, get_settings
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import SafetyEngine
+from server.mac.bridge import MacBridge
 from server.tools.catalog import default_registry
 from server.tools.executor import LocalToolExecutor
 from server.tools.registry import ToolRegistry
@@ -42,6 +43,11 @@ def get_tool_registry() -> ToolRegistry:
 @lru_cache
 def get_confirmation_store() -> ConfirmationStore:
     return ConfirmationStore(ttl_seconds=get_settings().safety_confirmation_ttl_seconds)
+
+
+@lru_cache
+def get_mac_bridge() -> MacBridge:
+    return MacBridge(timeout_seconds=get_settings().jarvis_mac_timeout_seconds)
 
 
 def get_tool_executor(settings: Settings = Depends(get_settings)) -> LocalToolExecutor:
@@ -89,4 +95,5 @@ def reset_singletons() -> None:
     get_tts_engine.cache_clear()
     get_tool_registry.cache_clear()
     get_confirmation_store.cache_clear()
+    get_mac_bridge.cache_clear()
     get_settings.cache_clear()

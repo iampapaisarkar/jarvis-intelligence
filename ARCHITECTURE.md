@@ -150,9 +150,9 @@ The LLM may only name tools that exist in the registry.
 
 ## Communication
 
-- Transport: HTTP now; WebSocket for the Mac client in Phase 7
+- Transport: HTTP for chat/intent/speech; WebSocket `/v1/mac` for the Mac body
 - Bind: configurable LAN host/port (default `0.0.0.0:8765`)
-- Auth: optional shared token (`X-Jarvis-Token` / Bearer)
+- Auth: optional shared token (`X-Jarvis-Token` / Bearer, or `?token=` on the Mac socket)
 - Sessions: server-issued `session_id`
 - Unknown message types are rejected
 - TLS is a later addition; do not port-forward this service to the internet
@@ -175,7 +175,7 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 | **4** | Intent parser, tool registry, structured tool calls | **complete** (see issues below) |
 | **5** | Safety engine, risk levels, confirmation, command policy | **complete** (see issues below) |
 | **6** | Windows tools (apps, filesystem, safe terminal) | **complete** (see issues below) |
-| 7 | Mac client (WebSocket, auth, macOS tool executor) | not started |
+| **7** | Mac client (WebSocket, auth, macOS tool executor) | **complete** (see issues below) |
 | 8 | SQLite memory (preferences, history, aliases) | not started |
 | 9 | Wake word "Jarvis" with push-to-talk fallback | not started |
 
@@ -304,11 +304,32 @@ Phase 6 proves the brain can act on the local machine after safety:
 
 Verified on macOS arm64 / Python 3.12: 91 tests passed. Live `POST /v1/intent` for system info returned `get_system_info` with `executed: true` (`Darwin 25.4.0` / arm64, posix backend). Health reports version `0.6.0` and `tools.execution: posix`. Mac `open_application` stays `deferred_mac`.
 
-1. **Mac actions wait for Phase 7.** `target: mac` returns `deferred_mac` and does not run locally.
+1. **Mac actions wait for a connected client.** `target: mac` returns `deferred_mac` until Phase 7's WebSocket body is attached.
 2. **App launch is best-effort.** Unknown names fail if the executable is not in PATH or the usual install folders.
 3. **Safe terminal is a small allowlist.** Arbitrary commands stay blocked even after confirmation.
 4. **Not proven on the Windows i3.**
 5. **Writes go to the real user home** unless tests override `HOME` / `JARVIS_WORKSPACE`.
+
+## Phase 7 detail
+
+Phase 7 proves the Mac body can act after the brain has planned and gated:
+
+1. The brain keeps a single Mac WebSocket at `WS /v1/mac`. A new client replaces the old one.
+2. Auth is the same shared token (`X-Jarvis-Token`, Bearer, or `?token=`). Bad auth closes with `1008`.
+3. First message must be `hello` (`role: mac-client`). Unknown types are rejected.
+4. `target: mac` tools are dispatched as `tool_request`. If no client is connected, the brain still returns `deferred_mac`.
+5. The Mac client re-validates the tool name, schema, target, and hard safety denies before `LocalToolExecutor(force_local=True)` runs. It does not trust the network.
+6. Health reports `mac.connected`, `hostname`, and client `version`.
+
+## Phase 7 issues (open)
+
+Verified on macOS arm64 / Python 3.12: 105 tests passed. Live `WS /v1/mac` connected (`Papais-MacBook-Air.local`, client `0.7.0`). Live `POST /v1/intent` `"VS Code ta open kore dao."` with `target: mac` returned `open_application` with `executed: true` (`open -a Visual Studio Code`) via the Mac client. Health reports version `0.7.0` and `mac.connected: true`. With no client, the same tool stays `deferred_mac`.
+
+1. **One Mac at a time.** A second connection closes the first. No queue of bodies.
+2. **The Mac still uses the brain's confirmation.** High-risk actions are confirmed on the brain session, then executed on the Mac. The client will still hard-deny blocked paths/commands.
+3. **LAN only.** No TLS. Do not port-forward `/v1/mac`.
+4. **Not proven on a separate Windows brain + Mac body pair.** Live checks in this environment run both on the same Mac.
+5. **Timeouts return `mac_timeout`.** Default `JARVIS_MAC_TIMEOUT_SECONDS=20`.
 
 
 ## Runtime layout (target)
@@ -319,8 +340,9 @@ JARVIS/
 │   ├── ai/          # LLM, STT, TTS, intent parser
 │   ├── tools/       # registry + local executor (Windows/posix)
 │   ├── safety/      # policy, confirmation store
+│   ├── mac/         # WebSocket bridge to the Mac body
 │   └── api/
-├── mac-client/      # macOS body (Phase 7+)
+├── mac_client/      # macOS body (Phase 7)
 ├── models/          # local GGUF / Whisper / Piper files (gitignored binaries)
 ├── scripts/         # Windows setup and health
 └── tests/
