@@ -1,3 +1,3 @@
-"""Jarvis Phase 1 — local offline LLM server."""
+"""Jarvis Phase 2 — local offline LLM + STT server."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

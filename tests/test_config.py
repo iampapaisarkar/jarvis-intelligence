@@ -10,6 +10,13 @@ def test_relative_model_path_resolves_under_repo_root():
     assert resolved.is_absolute()
 
 
+def test_stt_directory_prefers_ggml_base(tmp_path):
+    (tmp_path / "ggml-tiny.bin").write_bytes(b"x" * 16)
+    (tmp_path / "ggml-base.bin").write_bytes(b"y" * 16)
+    settings = Settings(stt_model_path=tmp_path)
+    assert settings.stt_model_file.name == "ggml-base.bin"
+
+
 def test_empty_n_threads_env_is_ignored(monkeypatch):
     monkeypatch.setenv("LLM_N_THREADS", "")
     from server.config import clear_settings_cache

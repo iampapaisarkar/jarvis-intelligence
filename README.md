@@ -4,9 +4,9 @@ Local, offline personal voice assistant. The AI brain runs on a Windows laptop (
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 1** — local LLM server (llama.cpp + GGUF + FastAPI).
+Current milestone: **Phase 2** — local LLM + local Whisper STT.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and remaining phases.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
 ---
 
@@ -19,7 +19,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and remaining 
 | RAM | 8 GB (close other heavy apps while the model is loaded) |
 | GPU | Not required. Do not assume CUDA. |
 | Python | **3.11, 3.12, or 3.13** (64-bit). Avoid 3.14 until llama-cpp-python ships wheels for it. |
-| Disk | ~2 GB for the default 1.5B Q4_K_M GGUF plus the Python venv |
+| Disk | ~2.2 GB for the 1.5B GGUF + Whisper `ggml-base.bin` plus the Python venv |
 
 Optional build tools (only if `pip` has to compile `llama-cpp-python`):
 
@@ -107,6 +107,30 @@ LLM_MODEL_PATH=models/llm/qwen2.5-0.5b-instruct-q4_k_m.gguf
 
 You may also place any compatible Instruct GGUF at the path in `LLM_MODEL_PATH`.
 
+### 4b. Download the Whisper STT model (needs internet once)
+
+Default: multilingual **ggml-base.bin** (~142 MB). Needed for English, Bangla, and mixed speech.
+
+```powershell
+python scripts\download_model.py --stt
+```
+
+This writes:
+
+```
+models\stt\ggml-base.bin
+```
+
+If RAM is tight, use tiny (~75 MB, weaker Bangla):
+
+```powershell
+python scripts\download_model.py --stt --tiny
+```
+
+Then set `STT_MODEL_PATH=models/stt/ggml-tiny.bin` in `.env`.
+
+On Windows, `pywhispercpp` may need the same C++ Build Tools as llama-cpp-python. Microphone capture needs a working input device; WAV upload works without a mic.
+
 ### 5. Configure
 
 Edit `.env` (never commit it):
@@ -116,6 +140,7 @@ JARVIS_HOST=0.0.0.0
 JARVIS_PORT=8765
 JARVIS_AUTH_TOKEN=change-me-to-a-long-random-string
 LLM_MODEL_PATH=models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
+STT_MODEL_PATH=models/stt/ggml-base.bin
 LOG_LEVEL=INFO
 ```
 
@@ -161,6 +186,24 @@ curl -X POST http://127.0.0.1:8765/v1/chat `
 
 Disconnect the internet and repeat. The reply must still come from the local GGUF.
 
+### 8b. Transcribe a WAV file (local Whisper)
+
+```powershell
+curl -X POST http://127.0.0.1:8765/v1/transcribe `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string" `
+  -F "audio=@command.wav" `
+  -F "language=en"
+```
+
+Push-to-talk (records from the default microphone):
+
+```powershell
+curl -X POST http://127.0.0.1:8765/v1/listen `
+  -H "Content-Type: application/json" `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string" `
+  -d "{\"duration_seconds\":5,\"language\":\"auto\"}"
+```
+
 ### 9. Tests
 
 ```powershell
@@ -186,18 +229,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 python scripts/download_model.py
+python scripts/download_model.py --stt
 python -m uvicorn server.main:app --host 127.0.0.1 --port 8765
 python -m pytest tests -q
 ```
 
 ---
 
-## API (Phase 1)
+## API (Phase 2)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | Process, model file, load state |
+| GET | `/health` | no | LLM + STT file/load state |
 | POST | `/v1/chat` | token | Local chat completion |
+| POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
+| POST | `/v1/listen` | token | Microphone capture → transcript |
 
 `POST /v1/chat` body:
 
@@ -226,7 +272,7 @@ scripts/    Windows setup / start / health
 tests/      Unit + integration tests
 ```
 
-STT, TTS, tools, safety, Mac client, and memory are documented in ARCHITECTURE.md and are not implemented yet.
+STT, TTS, tools, safety, Mac client, and memory beyond transcription are documented in ARCHITECTURE.md and are not implemented yet.
 
 ---
 

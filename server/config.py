@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,7 +36,14 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.7
     llm_preload: bool = False
 
-    stt_model_path: Path = Path("models/stt")
+    stt_model_path: Path = Path("models/stt/ggml-base.bin")
+    stt_language: str = "auto"
+    stt_n_threads: Optional[int] = None
+    stt_preload: bool = False
+    stt_use_gpu: bool = False
+    stt_max_audio_seconds: float = 20.0
+    stt_max_upload_bytes: int = 8 * 1024 * 1024
+    mic_sample_rate: int = 16000
     tts_model_path: Path = Path("models/tts")
 
     log_level: str = "INFO"
@@ -65,6 +72,13 @@ class Settings(BaseSettings):
             raise ValueError(f"LOG_LEVEL must be one of {sorted(allowed)}")
         return upper
 
+    @field_validator("stt_max_audio_seconds")
+    @classmethod
+    def _stt_seconds(cls, value: float) -> float:
+        if value < 1 or value > 60:
+            raise ValueError("STT_MAX_AUDIO_SECONDS must be between 1 and 60")
+        return value
+
     def resolve_path(self, path: Path) -> Path:
         if path.is_absolute():
             return path
@@ -73,6 +87,29 @@ class Settings(BaseSettings):
     @property
     def model_file(self) -> Path:
         return self.resolve_path(self.llm_model_path)
+
+    @property
+    def stt_model_file(self) -> Path:
+        path = self.resolve_path(self.stt_model_path)
+        if path.is_file():
+            return path
+        if path.is_dir():
+            preferred = (
+                "ggml-base.bin",
+                "ggml-base-q5_1.bin",
+                "ggml-small.bin",
+                "ggml-tiny.bin",
+            )
+            for name in preferred:
+                candidate = path / name
+                if candidate.is_file() and candidate.stat().st_size > 0:
+                    return candidate
+            matches = sorted(
+                p for p in path.glob("ggml-*.bin") if p.is_file() and p.stat().st_size > 0
+            )
+            if matches:
+                return matches[0]
+        return path
 
     @property
     def log_directory(self) -> Path:

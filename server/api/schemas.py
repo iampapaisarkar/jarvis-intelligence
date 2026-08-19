@@ -5,15 +5,24 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-class HealthResponse(BaseModel):
-    status: Literal["ok", "degraded"]
-    version: str
+class ModelHealth(BaseModel):
     backend: str
     model_path: str
     model_file_present: bool
     model_loaded: bool
+
+
+class LlmHealth(ModelHealth):
     n_ctx: int
     n_gpu_layers: int
+
+
+class HealthResponse(BaseModel):
+    status: Literal["ok", "degraded"]
+    version: str
+    voice_ready: bool
+    llm: LlmHealth
+    stt: ModelHealth
 
 
 class ChatMessage(BaseModel):
@@ -43,6 +52,32 @@ class ChatResponse(BaseModel):
     usage: TokenUsage
     latency_ms: float
     finish_reason: Optional[str] = None
+
+
+class TranscriptSegmentOut(BaseModel):
+    text: str
+    start_ms: float = 0.0
+    end_ms: float = 0.0
+    confidence: Optional[float] = None
+
+
+class TranscriptResponse(BaseModel):
+    type: Literal["transcript"] = "transcript"
+    text: str
+    language: Optional[str] = None
+    confidence: Optional[float] = None
+    segments: list[TranscriptSegmentOut] = Field(default_factory=list)
+    duration_ms: float = 0.0
+    latency_ms: float = 0.0
+    model: str
+    session_id: str
+    source: Literal["upload", "microphone"] = "upload"
+
+
+class ListenRequest(BaseModel):
+    duration_seconds: float = Field(default=5.0, ge=1.0, le=20.0)
+    language: Optional[str] = Field(default=None, max_length=16)
+    session_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class ErrorBody(BaseModel):
