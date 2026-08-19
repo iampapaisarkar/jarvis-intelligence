@@ -13,7 +13,8 @@ def test_list_tools_does_not_expose_execute(client):
     assert body["execution"] == "disabled"
     names = [item["name"] for item in body["tools"]]
     assert "open_application" in names
-    assert "run_terminal" not in names
+    assert "run_terminal" in names
+    assert "delete_path" in names
     assert all("execute" not in item for item in body["tools"])
 
 
@@ -45,6 +46,8 @@ def test_intent_tool_call_is_not_executed(client, fake_llm):
     assert body["arguments"]["application"] == "Visual Studio Code"
     assert body["executed"] is False
     assert body["risk"] == "low"
+    assert body["safety"] == "allowed"
+    assert body["confirmed"] is False
 
 
 def test_intent_clarification(client, fake_llm):

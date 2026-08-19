@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     intent_temperature: float = 0.1
     intent_json_retries: int = 1
 
+    safety_confirmation_ttl_seconds: int = 120
+
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
 
@@ -115,6 +117,13 @@ class Settings(BaseSettings):
     def _intent_retries(cls, value: int) -> int:
         if value < 0 or value > 2:
             raise ValueError("INTENT_JSON_RETRIES must be between 0 and 2")
+        return value
+
+    @field_validator("safety_confirmation_ttl_seconds")
+    @classmethod
+    def _confirm_ttl(cls, value: int) -> int:
+        if value < 15 or value > 3600:
+            raise ValueError("SAFETY_CONFIRMATION_TTL_SECONDS must be between 15 and 3600")
         return value
 
     def resolve_path(self, path: Path) -> Path:

@@ -8,8 +8,9 @@ def test_health_ok_when_model_file_present(client, fake_llm, fake_stt, fake_tts)
     assert body["stt"]["backend"] == "fake-whisper"
     assert body["tts"]["backend"] == "fake-piper"
     assert body["tts"]["model_file_present"] is True
-    assert body["tools"]["registered"] == 5
+    assert body["tools"]["registered"] == 7
     assert body["tools"]["execution"] == "disabled"
+    assert body["safety"]["policy"] == "local"
     assert body["version"]
 
 

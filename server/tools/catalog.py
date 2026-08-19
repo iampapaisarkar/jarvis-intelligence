@@ -70,6 +70,18 @@ class EmptyArgs(BaseModel):
     pass
 
 
+class RunTerminalArgs(BaseModel):
+    command: str = Field(min_length=1, max_length=500)
+
+    @field_validator("command")
+    @classmethod
+    def _command(cls, value: str) -> str:
+        cleaned = " ".join(value.strip().split())
+        if not cleaned:
+            raise ValueError("command is required")
+        return cleaned
+
+
 OPEN_APPLICATION = ToolSpec(
     name="open_application",
     description="Open an installed application by canonical name.",
@@ -115,12 +127,32 @@ CREATE_FILE = ToolSpec(
     args_model=CreateFileArgs,
 )
 
+DELETE_PATH = ToolSpec(
+    name="delete_path",
+    description="Delete a file or folder. Always needs confirmation. System paths are blocked.",
+    allowed_targets=("windows", "mac"),
+    risk="high",
+    requires_confirmation=True,
+    args_model=PathArgs,
+)
+
+RUN_TERMINAL = ToolSpec(
+    name="run_terminal",
+    description="Run one shell command. Dangerous commands are blocked. Always needs confirmation.",
+    allowed_targets=("windows", "mac"),
+    risk="high",
+    requires_confirmation=True,
+    args_model=RunTerminalArgs,
+)
+
 DEFAULT_TOOLS = (
     OPEN_APPLICATION,
     LIST_DIRECTORY,
     GET_SYSTEM_INFO,
     CREATE_FOLDER,
     CREATE_FILE,
+    DELETE_PATH,
+    RUN_TERMINAL,
 )
 
 

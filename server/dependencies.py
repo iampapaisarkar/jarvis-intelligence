@@ -9,6 +9,8 @@ from server.ai.llm import LLMEngine, LlamaCppEngine
 from server.ai.stt import SpeechToText, WhisperCppSTT
 from server.ai.tts import PiperTTS, TextToSpeech
 from server.config import Settings, get_settings
+from server.safety.confirm import ConfirmationStore
+from server.safety.engine import SafetyEngine
 from server.tools.catalog import default_registry
 from server.tools.registry import ToolRegistry
 
@@ -36,6 +38,18 @@ def get_tool_registry() -> ToolRegistry:
     return default_registry()
 
 
+@lru_cache
+def get_confirmation_store() -> ConfirmationStore:
+    return ConfirmationStore(ttl_seconds=get_settings().safety_confirmation_ttl_seconds)
+
+
+def get_safety_engine(
+    registry: ToolRegistry = Depends(get_tool_registry),
+    store: ConfirmationStore = Depends(get_confirmation_store),
+) -> SafetyEngine:
+    return SafetyEngine(registry, store)
+
+
 def get_intent_parser(
     engine: LLMEngine = Depends(get_llm_engine),
     registry: ToolRegistry = Depends(get_tool_registry),
@@ -61,8 +75,13 @@ def settings_dep(settings: Settings = Depends(get_settings)) -> Settings:
 
 
 def reset_singletons() -> None:
+    try:
+        get_confirmation_store().clear()
+    except Exception:
+        pass
     get_llm_engine.cache_clear()
     get_stt_engine.cache_clear()
     get_tts_engine.cache_clear()
     get_tool_registry.cache_clear()
+    get_confirmation_store.cache_clear()
     get_settings.cache_clear()

@@ -172,8 +172,8 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 | **1** | Python FastAPI server, llama.cpp, GGUF load, `/health`, `/v1/chat`, config, logging | **complete** (see issues below) |
 | **2** | Local STT (whisper.cpp), microphone/audio input, `/v1/transcribe`, `/v1/listen` | **complete** (see issues below) |
 | **3** | Local TTS (Piper), `/v1/speak`, optional speaker playback | **complete** (see issues below) |
-| **4** | Intent parser, tool registry, structured tool calls | **this milestone** |
-| 5 | Safety engine, risk levels, confirmation, command policy | not started |
+| **4** | Intent parser, tool registry, structured tool calls | **complete** (see issues below) |
+| **5** | Safety engine, risk levels, confirmation, command policy | **complete** (see issues below) |
 | 6 | Windows tools (apps, filesystem, safe terminal) | not started |
 | 7 | Mac client (WebSocket, auth, macOS tool executor) | not started |
 | 8 | SQLite memory (preferences, history, aliases) | not started |
@@ -265,9 +265,30 @@ Verified on macOS arm64 / Python 3.12: 65 tests passed. Live `POST /v1/intent` f
 
 1. **Plans only.** Nothing opens apps or touches the filesystem yet. Phase 5 adds safety; Phase 6/7 execute.
 2. **1.5B JSON quality varies.** Intent uses `json_mode` and one retry. Ambiguous speech may become a clarification instead of a tool call.
-3. **No delete or terminal tools.** Those wait for the safety engine so the model cannot name them.
+3. **Delete and terminal waited for Phase 5.** They are now in the catalog and gated by safety.
 4. **Not proven on the Windows i3.**
 5. **Caller `target` wins.** If `POST /v1/intent` sets `"target":"mac"`, that overrides the model's target. Otherwise the model target is used, then `JARVIS_DEFAULT_TARGET` (windows).
+
+## Phase 5 detail
+
+Phase 5 proves the brain can refuse and confirm without trusting the LLM:
+
+1. `SafetyEngine` reviews every tool plan. Risk, blocked paths, and blocked commands are deterministic.
+2. LOW actions that pass policy are `allowed` (still not executed). MEDIUM/HIGH need confirmation. Independently blocked actions are `denied` even if the user says yes.
+3. Confirmation is bound to `session_id` + `confirmation_id`. Another session cannot approve it. Spoken "yes"/"জি"/"no" on the same session works; `POST /v1/confirm` is the explicit API.
+4. Hard denies include system/root paths, credential files, disk formatting, firewall/defender tampering, and download-and-run style commands.
+5. `delete_path` and `run_terminal` are in the catalog so the model can name them; safety still blocks the dangerous cases.
+6. `executed` remains false until Phase 6.
+
+## Phase 5 issues (open)
+
+Verified on macOS arm64 / Python 3.12: 82 tests passed. Live `POST /v1/intent` for create `~/Projects/demo` returned `confirmation_required`; `POST /v1/confirm` returned `confirmed: true` with `executed: false`. `Delete C:\Windows` returned `denied` / `blocked_by_policy` without echoing the action. Health reports 7 tools, `execution: disabled`, local safety policy.
+
+1. **Still no OS execution.** Confirmation only marks a plan `confirmed`. Phase 6/7 run tools.
+2. **Policy is lexical.** Paths are normalized without touching the real filesystem, so some equivalent spellings could slip through until execution-time checks in Phase 6.
+3. **Pending state is in-memory.** A process restart drops confirmations. TTL default is 120 seconds.
+4. **Not proven on the Windows i3.**
+5. **Spoken yes/no is a small phrase list.** Longer replies fall through to a new intent and cancel the pending action.
 
 
 ## Runtime layout (target)
@@ -276,7 +297,8 @@ Verified on macOS arm64 / Python 3.12: 65 tests passed. Live `POST /v1/intent` f
 JARVIS/
 ├── server/          # Windows brain (FastAPI)
 │   ├── ai/          # LLM, STT, TTS, intent parser
-│   ├── tools/       # registry + schemas (no OS execution in Phase 4)
+│   ├── tools/       # registry + schemas (execute() still disabled)
+│   ├── safety/      # policy, confirmation store
 │   └── api/
 ├── mac-client/      # macOS body (Phase 7+)
 ├── models/          # local GGUF / Whisper / Piper files (gitignored binaries)

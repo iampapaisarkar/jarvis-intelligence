@@ -20,6 +20,12 @@ class LlmHealth(ModelHealth):
 class ToolsHealth(BaseModel):
     registered: int
     execution: Literal["disabled"] = "disabled"
+    pending_confirmations: int = 0
+
+
+class SafetyHealth(BaseModel):
+    policy: Literal["local"] = "local"
+    confirmation_ttl_seconds: int
 
 
 class HealthResponse(BaseModel):
@@ -30,6 +36,7 @@ class HealthResponse(BaseModel):
     stt: ModelHealth
     tts: ModelHealth
     tools: ToolsHealth
+    safety: SafetyHealth
 
 
 class ChatMessage(BaseModel):
@@ -101,8 +108,10 @@ class IntentRequest(BaseModel):
 
 
 class IntentResponse(BaseModel):
-    type: Literal["tool_call", "clarification", "reply"]
+    type: Literal["tool_call", "clarification", "reply", "confirmation_required", "denied"]
     executed: bool = False
+    confirmed: bool = False
+    safety: Literal["allowed", "needs_confirmation", "denied", "not_applicable"] = "not_applicable"
     message: str
     spoken_reply: str
     session_id: str
@@ -111,10 +120,30 @@ class IntentResponse(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     risk: Optional[Literal["low", "medium", "high"]] = None
     requires_confirmation: Optional[bool] = None
+    confirmation_id: Optional[str] = None
+    reason: Optional[str] = None
     model: str = ""
     usage: TokenUsage
     latency_ms: float = 0.0
     parse_recovered: bool = False
+
+
+class ConfirmRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=128)
+    confirmation_id: str = Field(min_length=8, max_length=128)
+    approved: bool
+
+
+class PendingQueryResponse(BaseModel):
+    pending: bool
+    session_id: str
+    confirmation_id: Optional[str] = None
+    tool: Optional[str] = None
+    target: Optional[Literal["windows", "mac"]] = None
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    risk: Optional[str] = None
+    spoken_reply: Optional[str] = None
+    expires_in_seconds: Optional[float] = None
 
 
 class ToolListItem(BaseModel):

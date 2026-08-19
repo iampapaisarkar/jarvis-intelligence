@@ -10,17 +10,19 @@ def test_default_registry_names_are_stable():
         "get_system_info",
         "create_folder",
         "create_file",
+        "delete_path",
+        "run_terminal",
     ]
-    assert len(registry) == 5
+    assert len(registry) == 7
 
 
 def test_unknown_tool_is_rejected():
     registry = default_registry()
     try:
-        registry.require("run_terminal")
+        registry.require("format_disk")
         assert False, "expected UnknownToolError"
     except UnknownToolError as exc:
-        assert exc.name == "run_terminal"
+        assert exc.name == "format_disk"
 
 
 def test_open_application_aliases_vscode():

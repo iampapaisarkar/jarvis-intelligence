@@ -68,8 +68,8 @@ def test_unknown_tool_becomes_clarification(fake_llm):
     fake_llm.reply = json.dumps(
         {
             "type": "tool_call",
-            "tool": "run_terminal",
-            "arguments": {"command": "rm -rf /"},
+            "tool": "format_disk",
+            "arguments": {"disk": "c"},
         }
     )
     parsed = asyncio.run(_parser(fake_llm).parse("wipe the disk", session_id="s3"))

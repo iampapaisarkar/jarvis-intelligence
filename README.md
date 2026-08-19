@@ -4,7 +4,7 @@ Local, offline personal voice assistant. The AI brain runs on a Windows laptop (
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 4** — local LLM + Whisper STT + Piper TTS + structured intent.
+Current milestone: **Phase 5** — local LLM + STT + TTS + intent + safety.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
@@ -241,7 +241,18 @@ curl -X POST http://127.0.0.1:8765/v1/intent `
   -d "{\"text\":\"VS Code ta open kore dao.\",\"target\":\"mac\"}"
 ```
 
-`executed` is always `false` in Phase 4. Safety and real Windows/Mac tools start in later phases.
+`executed` is always `false` until Phase 6. Medium/high actions return `confirmation_required`. Blocked actions return `denied`.
+
+Confirm a pending action (same `session_id`):
+
+```powershell
+curl -X POST http://127.0.0.1:8765/v1/confirm `
+  -H "Content-Type: application/json" `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string" `
+  -d "{\"session_id\":\"your-session\",\"confirmation_id\":\"the-id\",\"approved\":true}"
+```
+
+Or send `"yes"` / `"জি"` to `/v1/intent` with the same session.
 
 List the catalog:
 
@@ -283,17 +294,19 @@ python -m pytest tests -q
 
 ---
 
-## API (Phase 4)
+## API (Phase 5)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | LLM + STT + TTS + tool catalog state |
+| GET | `/health` | no | LLM + STT + TTS + tool + safety state |
 | POST | `/v1/chat` | token | Local chat completion |
 | POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
 | POST | `/v1/listen` | token | Microphone capture → transcript |
 | POST | `/v1/speak` | token | Text → WAV (Piper / espeak-ng) |
-| POST | `/v1/intent` | token | Text → validated tool plan (not executed) |
+| POST | `/v1/intent` | token | Text → gated tool plan (not executed) |
 | GET | `/v1/tools` | token | Registered tool schemas |
+| GET | `/v1/pending` | token | Pending confirmation for a session |
+| POST | `/v1/confirm` | token | Approve or reject a pending action |
 
 `POST /v1/chat` body:
 
@@ -322,7 +335,7 @@ scripts/    Windows setup / start / health
 tests/      Unit + integration tests
 ```
 
-STT, TTS, and intent planning are implemented. Safety, OS tool execution, Mac client, and memory are documented in ARCHITECTURE.md.
+STT, TTS, intent planning, and safety confirmation are implemented. OS tool execution, Mac client, and memory are documented in ARCHITECTURE.md.
 
 ---
 
