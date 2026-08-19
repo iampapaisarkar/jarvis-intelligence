@@ -14,6 +14,7 @@ from server.api.memory import router as memory_router
 from server.api.routes import router as chat_router
 from server.api.speech import router as speech_router
 from server.api.tts import router as tts_router
+from server.api.wake import router as wake_router
 from server.ai.llm import LLMError
 from server.ai.stt import STTError
 from server.ai.tts import TTSError
@@ -40,7 +41,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     registry = get_tool_registry()
     memory = get_memory_store()
     logger.info(
-        "Jarvis Phase 8 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s memory=%s",
+        "Jarvis Phase 9 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s memory=%s wake=%s",
         settings.jarvis_host,
         settings.jarvis_port,
         settings.model_file,
@@ -48,6 +49,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         settings.tts_model_file,
         len(registry),
         memory.path,
+        settings.jarvis_wake_word,
     )
     if settings.llm_preload:
         try:
@@ -78,7 +80,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Jarvis",
-        description="Local offline personal assistant brain (Phase 8: LLM + STT + TTS + intent + safety + tools + Mac client + memory)",
+        description="Local offline personal assistant brain (Phase 9: LLM + STT + TTS + intent + safety + tools + Mac client + memory + wake word)",
         version=__version__,
         lifespan=lifespan,
         docs_url="/docs",
@@ -91,6 +93,7 @@ def create_app() -> FastAPI:
     application.include_router(intent_router)
     application.include_router(mac_router)
     application.include_router(memory_router)
+    application.include_router(wake_router)
 
     @application.exception_handler(LLMError)
     async def llm_error_handler(_request, exc: LLMError) -> JSONResponse:

@@ -1,3 +1,3 @@
-"""Jarvis Phase 8 — local offline brain with SQLite memory."""
+"""Jarvis Phase 9 — local offline brain with wake-word and push-to-talk fallback."""
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"

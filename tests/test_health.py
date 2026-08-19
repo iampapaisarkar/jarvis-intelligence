@@ -14,6 +14,9 @@ def test_health_ok_when_model_file_present(client, fake_llm, fake_stt, fake_tts)
     assert body["mac"]["connected"] is False
     assert body["memory"]["ok"] is True
     assert body["memory"]["preferences"] >= 1
+    assert body["wake"]["enabled"] is True
+    assert body["wake"]["word"] == "jarvis"
+    assert body["wake"]["backend"] == "transcript"
     assert body["version"]
 
 

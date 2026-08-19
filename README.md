@@ -4,7 +4,7 @@ Local, offline personal voice assistant. The AI brain runs on a Windows laptop (
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 8** — local LLM + STT + TTS + intent + safety + tools + Mac WebSocket body + SQLite memory.
+Current milestone: **Phase 9** — local LLM + STT + TTS + intent + safety + tools + Mac body + SQLite memory + wake word with push-to-talk fallback.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
@@ -309,18 +309,24 @@ On the Mac body (same machine for development, or another Mac on the LAN against
 python -m mac_client --url ws://127.0.0.1:8765/v1/mac --token change-me
 ```
 
+Wake word on this Mac's microphone (sends short WAV clips to the brain; `/v1/listen` remains push-to-talk):
+
+```bash
+python -m mac_client --url ws://127.0.0.1:8765/v1/mac --token change-me --wake
+```
+
 Use the Windows LAN IP instead of `127.0.0.1` when the brain is a separate laptop. The client re-checks tools and paths locally; it does not blindly execute network payloads.
 
 ---
 
-## API (Phase 8)
+## API (Phase 9)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | LLM + STT + TTS + tool + safety + Mac client + memory state |
+| GET | `/health` | no | LLM + STT + TTS + tool + safety + Mac + memory + wake state |
 | POST | `/v1/chat` | token | Local chat completion |
 | POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
-| POST | `/v1/listen` | token | Microphone capture → transcript |
+| POST | `/v1/listen` | token | Push-to-talk: microphone → transcript |
 | POST | `/v1/speak` | token | Text → WAV (Piper / espeak-ng) |
 | POST | `/v1/intent` | token | Text → gated tool plan; executes local or Mac tools when allowed |
 | GET | `/v1/tools` | token | Registered tool schemas |
@@ -331,6 +337,9 @@ Use the Windows LAN IP instead of `127.0.0.1` when the brain is a separate lapto
 | GET/PUT/DELETE | `/v1/memory/preferences` | token | Allowlisted preferences |
 | GET/PUT/DELETE | `/v1/memory/aliases` | token | Application and path aliases |
 | GET | `/v1/memory/history` | token | Recent executed/deferred tasks |
+| POST | `/v1/wake/detect` | token | Check text for a leading "Jarvis" |
+| POST | `/v1/wake/audio` | token | Transcribe a WAV, then detect the wake word |
+| POST | `/v1/wake/listen` | token | Mic capture + detect; `fallback` keeps push-to-talk |
 
 `POST /v1/chat` body:
 
@@ -361,7 +370,7 @@ scripts/      Windows setup / start / health
 tests/        Unit + integration tests
 ```
 
-STT, TTS, intent, safety, local Windows/posix tools, the Mac WebSocket client, and SQLite memory are implemented. Wake word is documented in ARCHITECTURE.md.
+STT, TTS, intent, safety, tools, the Mac client, SQLite memory, and wake-word detection (with push-to-talk fallback) are implemented.
 
 ---
 

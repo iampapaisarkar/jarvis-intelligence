@@ -177,7 +177,7 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 | **6** | Windows tools (apps, filesystem, safe terminal) | **complete** (see issues below) |
 | **7** | Mac client (WebSocket, auth, macOS tool executor) | **complete** (see issues below) |
 | **8** | SQLite memory (preferences, history, aliases) | **complete** (see issues below) |
-| 9 | Wake word "Jarvis" with push-to-talk fallback | not started |
+| **9** | Wake word "Jarvis" with push-to-talk fallback | **complete** (see issues below) |
 
 Do not start the next phase until the current phase is tested.
 
@@ -351,6 +351,26 @@ Verified on macOS arm64 / Python 3.12: 119 tests passed. Live `POST /v1/intent` 
 3. **Path expansion is lexical.** `~/Projects/TestApp` is still confirmed before create.
 4. **Not proven on the Windows i3.**
 5. **The 1.5B model may still reply instead of calling `remember_preference`.** The projects-directory phrase is handled by a matcher so that example works anyway.
+
+## Phase 9 detail
+
+Phase 9 proves the assistant can be addressed by name without blocking on a perfect spotter:
+
+1. Wake word is **transcript-based**. After local Whisper, the text must *start* with Jarvis (optional hey/ok/oi, plus `jarvish` / `জার্ভিস`).
+2. `POST /v1/wake/detect` checks text. `POST /v1/wake/audio` transcribes a WAV first. `POST /v1/wake/listen` records from the mic.
+3. `POST /v1/listen` stays the push-to-talk fallback and does not require the wake word.
+4. `fallback: true` (default on `/v1/wake/listen`) treats a clip without Jarvis as a normal command.
+5. The Mac client `--wake` flag records short clips on the body and posts them to the brain. Health reports `wake.backend: transcript`.
+
+## Phase 9 issues (open)
+
+Verified on macOS arm64 / Python 3.12: 130 tests passed. Live `POST /v1/wake/detect` `"Jarvis, open visual studio code"` returned `heard: true` and command `open visual studio code`. The same text without Jarvis and `fallback: true` returned `heard: false` with the full transcript as `command`. Health reports version `0.9.0` and `wake.backend: transcript`.
+
+1. **Not a neural wake-word engine.** Always-on spotting would need another model on the 8 GB CPU box. This MVP transcribes a clip, then looks for Jarvis at the start.
+2. **False negatives** if Whisper misses the name. Push-to-talk still works.
+3. **Wake must be first.** "Tell Jarvis to…" is ignored on purpose.
+4. **Microphone wake was not live-tested** on a real input device here (recorder is mocked in tests).
+5. **Not proven on the Windows i3.**
 
 
 ## Runtime layout (target)

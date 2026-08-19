@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     jarvis_mac_timeout_seconds: int = 20
     jarvis_memory_path: Path = Path("data/jarvis.sqlite")
     jarvis_memory_history_limit: int = 200
+    jarvis_wake_enabled: bool = True
+    jarvis_wake_word: str = "jarvis"
 
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
@@ -162,6 +164,14 @@ class Settings(BaseSettings):
         if value < 20 or value > 2000:
             raise ValueError("JARVIS_MEMORY_HISTORY_LIMIT must be between 20 and 2000")
         return value
+
+    @field_validator("jarvis_wake_word")
+    @classmethod
+    def _wake_word(cls, value: str) -> str:
+        cleaned = value.strip()
+        if len(cleaned) < 2 or len(cleaned) > 32:
+            raise ValueError("JARVIS_WAKE_WORD must be between 2 and 32 characters")
+        return cleaned
 
     def resolve_path(self, path: Path) -> Path:
         if path.is_absolute():

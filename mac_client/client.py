@@ -135,6 +135,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--token", default=None, help="Shared JARVIS_AUTH_TOKEN")
     parser.add_argument("--once", action="store_true", help="Exit after the first disconnect")
+    parser.add_argument("--wake", action="store_true", help="Listen for 'Jarvis' on this Mac's microphone")
+    parser.add_argument(
+        "--http-url",
+        default=None,
+        help="Brain HTTP base (default: derived from --url, e.g. http://127.0.0.1:8765)",
+    )
+    parser.add_argument("--wake-window", type=float, default=2.5, help="Seconds per wake clip")
+    parser.add_argument("--command-seconds", type=float, default=5.0, help="Seconds to record after a bare 'Jarvis'")
+    parser.add_argument(
+        "--no-ptt-fallback",
+        action="store_true",
+        help="Ignore clips that do not start with the wake word",
+    )
     return parser
 
 
@@ -148,7 +161,28 @@ def main(argv: Optional[list[str]] = None) -> None:
         print("Missing auth token. Pass --token or set JARVIS_AUTH_TOKEN.", file=sys.stderr)
         raise SystemExit(2)
     runner = MacToolRunner(settings)
+
+    async def _run() -> None:
+        tasks = [asyncio.create_task(run_client(url=url, token=token, runner=runner, once=args.once))]
+        if args.wake:
+            from mac_client.wake import brain_http_base, run_wake_loop
+
+            http_base = (args.http_url or brain_http_base(url)).rstrip("/")
+            tasks.append(
+                asyncio.create_task(
+                    run_wake_loop(
+                        http_base=http_base,
+                        token=token,
+                        window_seconds=args.wake_window,
+                        command_seconds=args.command_seconds,
+                        ptt_fallback=not args.no_ptt_fallback,
+                        once=args.once,
+                    )
+                )
+            )
+        await asyncio.gather(*tasks)
+
     try:
-        asyncio.run(run_client(url=url, token=token, runner=runner, once=args.once))
+        asyncio.run(_run())
     except KeyboardInterrupt:
         logger.info("mac client stopped")

@@ -4,7 +4,16 @@ from server import __version__
 from server.ai.llm import LLMEngine
 from server.ai.stt import SpeechToText
 from server.ai.tts import TextToSpeech
-from server.api.schemas import HealthResponse, LlmHealth, MacHealth, MemoryHealth, ModelHealth, SafetyHealth, ToolsHealth
+from server.api.schemas import (
+    HealthResponse,
+    LlmHealth,
+    MacHealth,
+    MemoryHealth,
+    ModelHealth,
+    SafetyHealth,
+    ToolsHealth,
+    WakeHealth,
+)
 from server.config import Settings, get_settings
 from server.dependencies import (
     get_confirmation_store,
@@ -77,4 +86,9 @@ async def health(
             version=bridge.client_version,
         ),
         memory=MemoryHealth(**memory.stats()),
+        wake=WakeHealth(
+            enabled=settings.jarvis_wake_enabled,
+            word=settings.jarvis_wake_word,
+            backend="transcript",
+        ),
     )

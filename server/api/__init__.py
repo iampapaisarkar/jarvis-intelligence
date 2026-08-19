@@ -5,6 +5,7 @@ from server.api.memory import router as memory_router
 from server.api.routes import router as chat_router
 from server.api.speech import router as speech_router
 from server.api.tts import router as tts_router
+from server.api.wake import router as wake_router
 
 __all__ = [
     "health_router",
@@ -14,4 +15,5 @@ __all__ = [
     "intent_router",
     "mac_router",
     "memory_router",
+    "wake_router",
 ]

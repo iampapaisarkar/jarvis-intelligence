@@ -42,6 +42,12 @@ class MemoryHealth(BaseModel):
     history: int = 0
 
 
+class WakeHealth(BaseModel):
+    enabled: bool = True
+    word: str = "jarvis"
+    backend: Literal["transcript"] = "transcript"
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     version: str
@@ -53,6 +59,7 @@ class HealthResponse(BaseModel):
     safety: SafetyHealth
     mac: MacHealth = Field(default_factory=MacHealth)
     memory: MemoryHealth = Field(default_factory=MemoryHealth)
+    wake: WakeHealth = Field(default_factory=WakeHealth)
 
 
 class ChatMessage(BaseModel):
@@ -108,6 +115,32 @@ class ListenRequest(BaseModel):
     duration_seconds: float = Field(default=5.0, ge=1.0, le=20.0)
     language: Optional[str] = Field(default=None, max_length=16)
     session_id: Optional[str] = Field(default=None, max_length=128)
+
+
+class WakeDetectRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    session_id: Optional[str] = Field(default=None, max_length=128)
+    fallback: bool = False
+
+
+class WakeListenRequest(ListenRequest):
+    fallback: bool = True
+
+
+class WakeResponse(BaseModel):
+    type: Literal["wake"] = "wake"
+    heard: bool
+    word: str
+    command: str = ""
+    transcript: str = ""
+    session_id: str
+    source: Literal["text", "upload", "microphone"] = "text"
+    fallback_used: bool = False
+    model: str = ""
+    language: Optional[str] = None
+    confidence: Optional[float] = None
+    duration_ms: float = 0.0
+    latency_ms: float = 0.0
 
 
 class SpeakRequest(BaseModel):
