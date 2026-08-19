@@ -46,6 +46,7 @@ class GatedIntent:
     total_tokens: int = 0
     latency_ms: float = 0.0
     parse_recovered: bool = False
+    result: Optional[dict[str, Any]] = None
 
     @property
     def arguments_or_empty(self) -> dict[str, Any]:
@@ -259,6 +260,7 @@ def _from_intent(
         total_tokens=intent.total_tokens,
         latency_ms=intent.latency_ms,
         parse_recovered=intent.parse_recovered,
+        result=None,
     )
 
 

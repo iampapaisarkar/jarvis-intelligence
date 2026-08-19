@@ -10,7 +10,7 @@ def test_list_tools_does_not_expose_execute(client):
     response = client.get("/v1/tools", headers={"X-Jarvis-Token": "test-token"})
     assert response.status_code == 200
     body = response.json()
-    assert body["execution"] == "disabled"
+    assert body["execution"] == "posix"
     names = [item["name"] for item in body["tools"]]
     assert "open_application" in names
     assert "run_terminal" in names
@@ -23,7 +23,7 @@ def test_intent_requires_auth(client):
     assert response.status_code == 401
 
 
-def test_intent_tool_call_is_not_executed(client, fake_llm):
+def test_intent_mac_tool_is_deferred(client, fake_llm):
     fake_llm.reply = json.dumps(
         {
             "type": "tool_call",
@@ -48,6 +48,7 @@ def test_intent_tool_call_is_not_executed(client, fake_llm):
     assert body["risk"] == "low"
     assert body["safety"] == "allowed"
     assert body["confirmed"] is False
+    assert body["reason"] == "deferred_mac"
 
 
 def test_intent_clarification(client, fake_llm):

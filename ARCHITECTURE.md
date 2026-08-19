@@ -174,7 +174,7 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 | **3** | Local TTS (Piper), `/v1/speak`, optional speaker playback | **complete** (see issues below) |
 | **4** | Intent parser, tool registry, structured tool calls | **complete** (see issues below) |
 | **5** | Safety engine, risk levels, confirmation, command policy | **complete** (see issues below) |
-| 6 | Windows tools (apps, filesystem, safe terminal) | not started |
+| **6** | Windows tools (apps, filesystem, safe terminal) | **complete** (see issues below) |
 | 7 | Mac client (WebSocket, auth, macOS tool executor) | not started |
 | 8 | SQLite memory (preferences, history, aliases) | not started |
 | 9 | Wake word "Jarvis" with push-to-talk fallback | not started |
@@ -284,11 +284,31 @@ Phase 5 proves the brain can refuse and confirm without trusting the LLM:
 
 Verified on macOS arm64 / Python 3.12: 82 tests passed. Live `POST /v1/intent` for create `~/Projects/demo` returned `confirmation_required`; `POST /v1/confirm` returned `confirmed: true` with `executed: false`. `Delete C:\Windows` returned `denied` / `blocked_by_policy` without echoing the action. Health reports 7 tools, `execution: disabled`, local safety policy.
 
-1. **Still no OS execution.** Confirmation only marks a plan `confirmed`. Phase 6/7 run tools.
+1. **Execution moved to Phase 6.** Confirmation still cannot bypass hard denies.
 2. **Policy is lexical.** Paths are normalized without touching the real filesystem, so some equivalent spellings could slip through until execution-time checks in Phase 6.
 3. **Pending state is in-memory.** A process restart drops confirmations. TTL default is 120 seconds.
 4. **Not proven on the Windows i3.**
 5. **Spoken yes/no is a small phrase list.** Longer replies fall through to a new intent and cancel the pending action.
+
+## Phase 6 detail
+
+Phase 6 proves the brain can act on the local machine after safety:
+
+1. `LocalToolExecutor` runs approved tools. The LLM still never calls the shell.
+2. Windows backend launches known apps, lists/creates/deletes files inside the user home (and optional `JARVIS_WORKSPACE`), reports system info, and runs an allowlisted terminal (`python --version`, `git status`, `ls`/`dir`, …) with `shell=False`.
+3. macOS/Linux dev uses `JARVIS_TOOLS_BACKEND=posix` (`open -a` for apps). `target: mac` is deferred until Phase 7.
+4. Execution re-checks path roots and the command allowlist. `python -c` and shell metacharacters are rejected.
+5. Health `tools.execution` is `windows`, `posix`, or `disabled`.
+
+## Phase 6 issues (open)
+
+Verified on macOS arm64 / Python 3.12: 91 tests passed. Live `POST /v1/intent` for system info returned `get_system_info` with `executed: true` (`Darwin 25.4.0` / arm64, posix backend). Health reports version `0.6.0` and `tools.execution: posix`. Mac `open_application` stays `deferred_mac`.
+
+1. **Mac actions wait for Phase 7.** `target: mac` returns `deferred_mac` and does not run locally.
+2. **App launch is best-effort.** Unknown names fail if the executable is not in PATH or the usual install folders.
+3. **Safe terminal is a small allowlist.** Arbitrary commands stay blocked even after confirmation.
+4. **Not proven on the Windows i3.**
+5. **Writes go to the real user home** unless tests override `HOME` / `JARVIS_WORKSPACE`.
 
 
 ## Runtime layout (target)
@@ -297,7 +317,7 @@ Verified on macOS arm64 / Python 3.12: 82 tests passed. Live `POST /v1/intent` f
 JARVIS/
 ├── server/          # Windows brain (FastAPI)
 │   ├── ai/          # LLM, STT, TTS, intent parser
-│   ├── tools/       # registry + schemas (execute() still disabled)
+│   ├── tools/       # registry + local executor (Windows/posix)
 │   ├── safety/      # policy, confirmation store
 │   └── api/
 ├── mac-client/      # macOS body (Phase 7+)

@@ -12,6 +12,7 @@ from server.config import Settings, get_settings
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import SafetyEngine
 from server.tools.catalog import default_registry
+from server.tools.executor import LocalToolExecutor
 from server.tools.registry import ToolRegistry
 
 
@@ -41,6 +42,10 @@ def get_tool_registry() -> ToolRegistry:
 @lru_cache
 def get_confirmation_store() -> ConfirmationStore:
     return ConfirmationStore(ttl_seconds=get_settings().safety_confirmation_ttl_seconds)
+
+
+def get_tool_executor(settings: Settings = Depends(get_settings)) -> LocalToolExecutor:
+    return LocalToolExecutor(settings)
 
 
 def get_safety_engine(

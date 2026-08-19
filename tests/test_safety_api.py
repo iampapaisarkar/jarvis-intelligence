@@ -31,7 +31,7 @@ def test_create_folder_requires_confirmation(client, fake_llm):
     assert pending.json()["confirmation_id"] == body["confirmation_id"]
 
 
-def test_confirm_yes_does_not_execute(client, fake_llm):
+def test_confirm_yes_creates_folder(client, fake_llm):
     fake_llm.reply = json.dumps(
         {
             "type": "tool_call",
@@ -54,9 +54,12 @@ def test_confirm_yes_does_not_execute(client, fake_llm):
     assert yes.status_code == 200
     assert body["type"] == "tool_call"
     assert body["confirmed"] is True
-    assert body["executed"] is False
+    assert body["executed"] is True
     assert body["safety"] == "allowed"
     assert body["tool"] == "create_folder"
+    from pathlib import Path
+
+    assert (Path.home() / "Projects" / "demo").is_dir()
 
 
 def test_spoken_yes_confirms_same_session(client, fake_llm):
@@ -80,7 +83,10 @@ def test_spoken_yes_confirms_same_session(client, fake_llm):
     body = yes.json()
     assert body["type"] == "tool_call"
     assert body["confirmed"] is True
-    assert body["executed"] is False
+    assert body["executed"] is True
+    from pathlib import Path
+
+    assert (Path.home() / "Projects" / "notes.txt").is_file()
 
 
 def test_other_session_cannot_confirm(client, fake_llm):

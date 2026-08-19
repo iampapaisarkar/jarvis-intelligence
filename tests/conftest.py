@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +11,7 @@ from server.ai.llm import ChatTurn, LLMResult
 from server.ai.stt import Transcript, TranscriptSegment
 from server.ai.tts import SynthesizedSpeech
 from server.config import clear_settings_cache
-from server.dependencies import get_llm_engine, get_stt_engine, get_tts_engine, reset_singletons
+from server.dependencies import get_llm_engine, get_stt_engine, get_tool_executor, get_tts_engine, reset_singletons
 from server.main import create_app
 from server.utils.logger import reset_logging_for_tests
 
@@ -188,8 +188,22 @@ class FakeTTS:
         )
 
 
+@dataclass
+class RecordingLauncher:
+    calls: list[list[str]] = field(default_factory=list)
+
+    def __call__(self, argv: list[str]) -> None:
+        self.calls.append(list(argv))
+
+
 @pytest.fixture(autouse=True)
 def isolated_settings(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    workspace = tmp_path / "workspace"
+    home.mkdir()
+    workspace.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("JARVIS_AUTH_TOKEN", "test-token")
     monkeypatch.setenv("LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setenv("LLM_MODEL_PATH", str(tmp_path / "missing.gguf"))
@@ -198,6 +212,9 @@ def isolated_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("LLM_PRELOAD", "false")
     monkeypatch.setenv("STT_PRELOAD", "false")
     monkeypatch.setenv("TTS_PRELOAD", "false")
+    monkeypatch.setenv("JARVIS_TOOLS_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_TOOLS_BACKEND", "posix")
+    monkeypatch.setenv("JARVIS_WORKSPACE", str(workspace))
     monkeypatch.setenv("LOG_LEVEL", "INFO")
     clear_settings_cache()
     reset_singletons()
@@ -223,10 +240,23 @@ def fake_tts() -> FakeTTS:
 
 
 @pytest.fixture
-def client(fake_llm: FakeLLM, fake_stt: FakeSTT, fake_tts: FakeTTS) -> TestClient:
+def app_launcher() -> RecordingLauncher:
+    return RecordingLauncher()
+
+
+@pytest.fixture
+def client(
+    fake_llm: FakeLLM, fake_stt: FakeSTT, fake_tts: FakeTTS, app_launcher: RecordingLauncher
+) -> TestClient:
+    from server.config import get_settings
+    from server.tools.executor import LocalToolExecutor
+
     app = create_app()
     app.dependency_overrides[get_llm_engine] = lambda: fake_llm
     app.dependency_overrides[get_stt_engine] = lambda: fake_stt
     app.dependency_overrides[get_tts_engine] = lambda: fake_tts
+    app.dependency_overrides[get_tool_executor] = lambda: LocalToolExecutor(
+        get_settings(), launch=app_launcher
+    )
     with TestClient(app) as test_client:
         yield test_client

@@ -14,6 +14,7 @@ from server.dependencies import (
     get_tts_engine,
 )
 from server.safety.confirm import ConfirmationStore
+from server.tools.executor import detect_backend
 from server.tools.registry import ToolRegistry
 
 router = APIRouter(tags=["health"])
@@ -57,7 +58,7 @@ async def health(
         ),
         tools=ToolsHealth(
             registered=len(registry),
-            execution="disabled",
+            execution="disabled" if detect_backend(settings) == "off" else detect_backend(settings),
             pending_confirmations=store.pending_count(),
         ),
         safety=SafetyHealth(

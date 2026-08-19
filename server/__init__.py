@@ -1,3 +1,3 @@
-"""Jarvis Phase 5 — local offline LLM + STT + TTS + intent + safety."""
+"""Jarvis Phase 6 — local offline brain with Windows/posix tool execution."""
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

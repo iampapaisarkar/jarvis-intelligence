@@ -57,6 +57,11 @@ class Settings(BaseSettings):
 
     safety_confirmation_ttl_seconds: int = 120
 
+    jarvis_tools_enabled: bool = True
+    jarvis_tools_backend: str = "auto"
+    jarvis_workspace: Optional[Path] = None
+    jarvis_terminal_timeout_seconds: int = 10
+
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
 
@@ -124,6 +129,21 @@ class Settings(BaseSettings):
     def _confirm_ttl(cls, value: int) -> int:
         if value < 15 or value > 3600:
             raise ValueError("SAFETY_CONFIRMATION_TTL_SECONDS must be between 15 and 3600")
+        return value
+
+    @field_validator("jarvis_tools_backend")
+    @classmethod
+    def _tools_backend(cls, value: str) -> str:
+        lower = value.strip().lower()
+        if lower not in {"auto", "windows", "posix", "off", "disabled"}:
+            raise ValueError("JARVIS_TOOLS_BACKEND must be auto, windows, posix, or off")
+        return lower
+
+    @field_validator("jarvis_terminal_timeout_seconds")
+    @classmethod
+    def _term_timeout(cls, value: int) -> int:
+        if value < 1 or value > 60:
+            raise ValueError("JARVIS_TERMINAL_TIMEOUT_SECONDS must be between 1 and 60")
         return value
 
     def resolve_path(self, path: Path) -> Path:

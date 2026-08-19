@@ -31,7 +31,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     tts = get_tts_engine()
     registry = get_tool_registry()
     logger.info(
-        "Jarvis Phase 5 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s",
+        "Jarvis Phase 6 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s",
         settings.jarvis_host,
         settings.jarvis_port,
         settings.model_file,
@@ -64,7 +64,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Jarvis",
-        description="Local offline personal assistant brain (Phase 5: LLM + STT + TTS + intent + safety)",
+        description="Local offline personal assistant brain (Phase 6: LLM + STT + TTS + intent + safety + tools)",
         version=__version__,
         lifespan=lifespan,
         docs_url="/docs",

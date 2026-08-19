@@ -19,7 +19,7 @@ class LlmHealth(ModelHealth):
 
 class ToolsHealth(BaseModel):
     registered: int
-    execution: Literal["disabled"] = "disabled"
+    execution: Literal["disabled", "windows", "posix"] = "disabled"
     pending_confirmations: int = 0
 
 
@@ -126,6 +126,7 @@ class IntentResponse(BaseModel):
     usage: TokenUsage
     latency_ms: float = 0.0
     parse_recovered: bool = False
+    result: Optional[dict[str, Any]] = None
 
 
 class ConfirmRequest(BaseModel):
@@ -157,7 +158,7 @@ class ToolListItem(BaseModel):
 
 
 class ToolListResponse(BaseModel):
-    execution: Literal["disabled"] = "disabled"
+    execution: Literal["disabled", "windows", "posix"] = "disabled"
     tools: list[ToolListItem]
 
 

@@ -15,10 +15,18 @@ from server.api.schemas import (
     ToolListItem,
     ToolListResponse,
 )
-from server.dependencies import get_confirmation_store, get_intent_parser, get_safety_engine, get_tool_registry
+from server.config import Settings, get_settings
+from server.dependencies import (
+    get_confirmation_store,
+    get_intent_parser,
+    get_safety_engine,
+    get_tool_executor,
+    get_tool_registry,
+)
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import GatedIntent, SafetyEngine
 from server.safety.phrases import classify_confirmation
+from server.tools.executor import LocalToolExecutor, apply_execution, detect_backend
 from server.tools.registry import ToolRegistry
 from server.utils.logger import get_logger
 from server.utils.security import verify_auth_token
@@ -30,7 +38,7 @@ logger = get_logger("jarvis.intent.api")
 def _response(gated: GatedIntent) -> IntentResponse:
     return IntentResponse(
         type=gated.type,
-        executed=False,
+        executed=gated.executed,
         confirmed=gated.confirmed,
         safety=gated.safety,
         message=gated.message,
@@ -51,6 +59,7 @@ def _response(gated: GatedIntent) -> IntentResponse:
         ),
         latency_ms=gated.latency_ms,
         parse_recovered=gated.parse_recovered,
+        result=gated.result,
     )
 
 
@@ -72,7 +81,10 @@ def _cancelled(session_id: str, message: str) -> IntentResponse:
     response_model=ToolListResponse,
     dependencies=[Depends(verify_auth_token)],
 )
-async def list_tools(registry: ToolRegistry = Depends(get_tool_registry)) -> ToolListResponse:
+async def list_tools(
+    registry: ToolRegistry = Depends(get_tool_registry),
+    settings: Settings = Depends(get_settings),
+) -> ToolListResponse:
     items = []
     for spec in registry.list():
         entry = spec.prompt_entry()
@@ -87,7 +99,9 @@ async def list_tools(registry: ToolRegistry = Depends(get_tool_registry)) -> Too
                 required=entry["required"],
             )
         )
-    return ToolListResponse(tools=items)
+    backend = detect_backend(settings)
+    execution = "disabled" if backend == "off" else backend
+    return ToolListResponse(execution=execution, tools=items)
 
 
 @router.get(
@@ -124,6 +138,8 @@ async def confirm_action(
     body: ConfirmRequest,
     store: ConfirmationStore = Depends(get_confirmation_store),
     engine: SafetyEngine = Depends(get_safety_engine),
+    registry: ToolRegistry = Depends(get_tool_registry),
+    executor: LocalToolExecutor = Depends(get_tool_executor),
 ) -> IntentResponse:
     pending = store.get(body.session_id, body.confirmation_id)
     if pending is None:
@@ -147,7 +163,7 @@ async def confirm_action(
             status_code=status.HTTP_410_GONE,
             detail="That confirmation expired. Please ask again.",
         )
-    return _response(engine.approve(popped, session_id=body.session_id))
+    return _response(apply_execution(engine.approve(popped, session_id=body.session_id), registry=registry, executor=executor))
 
 
 @router.post(
@@ -160,6 +176,8 @@ async def parse_intent(
     parser: IntentParser = Depends(get_intent_parser),
     engine: SafetyEngine = Depends(get_safety_engine),
     store: ConfirmationStore = Depends(get_confirmation_store),
+    registry: ToolRegistry = Depends(get_tool_registry),
+    executor: LocalToolExecutor = Depends(get_tool_executor),
 ) -> IntentResponse:
     session_id = body.session_id or str(uuid.uuid4())
     logger.info(
@@ -168,7 +186,7 @@ async def parse_intent(
         body.target,
         extra={"session_id": session_id},
     )
-    handled = _handle_spoken_confirmation(body.text, session_id, store, engine)
+    handled = _handle_spoken_confirmation(body.text, session_id, store, engine, registry, executor)
     if handled is not None:
         return handled
 
@@ -177,7 +195,7 @@ async def parse_intent(
         session_id=session_id,
         default_target=body.target,
     )
-    return _response(engine.gate(parsed))
+    return _response(apply_execution(engine.gate(parsed), registry=registry, executor=executor))
 
 
 def _handle_spoken_confirmation(
@@ -185,6 +203,8 @@ def _handle_spoken_confirmation(
     session_id: str,
     store: ConfirmationStore,
     engine: SafetyEngine,
+    registry: ToolRegistry,
+    executor: LocalToolExecutor,
 ) -> IntentResponse | None:
     verdict = classify_confirmation(text)
     pending = store.get_for_session(session_id)
@@ -194,7 +214,7 @@ def _handle_spoken_confirmation(
         popped = store.pop(session_id, pending.confirmation_id)
         if popped is None:
             return _cancelled(session_id, "That confirmation expired. Please ask again.")
-        return _response(engine.approve(popped, session_id=session_id))
+        return _response(apply_execution(engine.approve(popped, session_id=session_id), registry=registry, executor=executor))
     if verdict == "no":
         if pending is not None:
             store.cancel_session(session_id)
