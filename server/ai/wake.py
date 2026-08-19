@@ -8,6 +8,19 @@ from dataclasses import dataclass
 DEFAULT_WAKE_WORD = "jarvis"
 DEFAULT_ALIASES = ("jarvis", "jarvish", "জার্ভিস")
 _PREFIXES = ("hey", "hi", "ok", "okay", "oi")
+_JUNK_TAGS = re.compile(
+    r"^\[(?:blank(?:[_\s-]?audio)?|silence|music|noise|inaudible|cough)\]$",
+    re.IGNORECASE,
+)
+_JUNK_PHRASES = {
+    "blank",
+    "blank audio",
+    "(blank)",
+    "silence",
+    "you",
+    "thank you",
+    "thanks for watching",
+}
 
 
 @dataclass(frozen=True)
@@ -47,9 +60,21 @@ def match_wake_word(text: str, *, word: str = DEFAULT_WAKE_WORD) -> WakeMatch:
     return WakeMatch(True, canonical, command, transcript)
 
 
+def is_junk_transcript(text: str) -> bool:
+    """Whisper often emits tags like [BLANK_AUDIO] for silence. Those are not commands."""
+    cleaned = " ".join((text or "").split()).strip(" .!?")
+    if not cleaned:
+        return True
+    if _JUNK_TAGS.match(cleaned):
+        return True
+    compact = cleaned.casefold().replace("_", " ")
+    compact = compact.replace("[", "").replace("]", "").replace("(", "").replace(")", "")
+    return compact in _JUNK_PHRASES
+
+
 def command_or_fallback(match: WakeMatch, *, fallback: bool) -> str:
     if match.heard:
         return match.command
-    if fallback:
+    if fallback and not is_junk_transcript(match.transcript):
         return match.transcript
     return ""

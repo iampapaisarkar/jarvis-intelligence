@@ -21,6 +21,14 @@ from mac_client.runner import MacToolRunner
 logger = get_logger("jarvis.mac.client")
 
 
+def _is_auth_rejected(exc: BaseException) -> bool:
+    text = str(exc)
+    if "HTTP 401" in text or "HTTP 403" in text:
+        return True
+    response = getattr(exc, "response", None)
+    return getattr(response, "status_code", None) in {401, 403}
+
+
 def _with_token_query(url: str, token: str) -> str:
     parsed = urlparse(url)
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
@@ -88,8 +96,14 @@ async def run_client(
                     await _handle_brain_message(ws, message, runner)
         except asyncio.CancelledError:
             raise
-        except Exception:
-            logger.exception("mac client disconnected")
+        except Exception as exc:
+            if _is_auth_rejected(exc):
+                logger.error(
+                    "brain at %s rejected the token. Put the same JARVIS_AUTH_TOKEN in Windows .env and restart the server.",
+                    target_url or "unknown",
+                )
+            else:
+                logger.exception("mac client disconnected")
             if once:
                 return
             await asyncio.sleep(delay)
@@ -155,7 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Brain HTTP base (default: derived from --url, e.g. http://127.0.0.1:8765)",
     )
-    parser.add_argument("--wake-window", type=float, default=2.5, help="Seconds per wake clip")
+    parser.add_argument("--wake-window", type=float, default=4.0, help="Seconds per wake clip")
     parser.add_argument("--command-seconds", type=float, default=5.0, help="Seconds to record after a bare 'Jarvis'")
     parser.add_argument(
         "--no-ptt-fallback",

@@ -156,6 +156,15 @@ def read_wav(path: Path) -> tuple[np.ndarray, int]:
     return samples, rate
 
 
+def clip_is_quiet(path: Path, *, rms_threshold: float = 250.0) -> bool:
+    """True when a WAV is effectively silence (no speech energy)."""
+    samples, _rate = read_wav(path)
+    if samples.size == 0:
+        return True
+    rms = float(np.sqrt(np.mean(samples.astype(np.float64) ** 2)))
+    return rms < rms_threshold
+
+
 def play_wav(path: Path, *, device: Optional[int] = None) -> None:
     try:
         import sounddevice as sd

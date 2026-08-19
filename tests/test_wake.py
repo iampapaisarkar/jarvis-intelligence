@@ -32,6 +32,16 @@ def test_wake_word_not_in_the_middle():
     assert command_or_fallback(match, fallback=True) == match.transcript
 
 
+def test_blank_audio_is_not_a_command():
+    from server.ai.wake import is_junk_transcript
+
+    assert is_junk_transcript("[BLANK_AUDIO]") is True
+    assert is_junk_transcript("Thank you.") is True
+    assert is_junk_transcript("open safari") is False
+    match = match_wake_word("[BLANK_AUDIO]")
+    assert command_or_fallback(match, fallback=True) == ""
+
+
 def test_wake_detect_requires_auth(client):
     response = client.post("/v1/wake/detect", json={"text": "Jarvis hello"})
     assert response.status_code == 401
@@ -112,6 +122,32 @@ def test_wake_listen_ptt_fallback(client, fake_stt, monkeypatch):
     assert body["command"] == "open visual studio code"
     assert body["fallback_used"] is True
     assert body["source"] == "microphone"
+
+
+def test_wake_audio_blank_fallback_is_empty(client, fake_stt, tmp_path):
+    fake_stt.reply = "[BLANK_AUDIO]"
+    wav = tmp_path / "wake.wav"
+    write_wav_mono16k(wav, np.zeros(1600, dtype=np.int16), 16000)
+    response = client.post(
+        "/v1/wake/audio",
+        headers={"X-Jarvis-Token": "test-token"},
+        files={"audio": ("wake.wav", wav.read_bytes(), "audio/wav")},
+        data={"fallback": "true"},
+    )
+    body = response.json()
+    assert body["heard"] is False
+    assert body["command"] == ""
+
+
+def test_quiet_clip_detected(tmp_path):
+    from server.utils.audio import clip_is_quiet
+
+    wav = tmp_path / "quiet.wav"
+    write_wav_mono16k(wav, np.zeros(16000, dtype=np.int16), 16000)
+    assert clip_is_quiet(wav) is True
+    loud = tmp_path / "loud.wav"
+    write_wav_mono16k(loud, np.full(16000, 2000, dtype=np.int16), 16000)
+    assert clip_is_quiet(loud) is False
 
 
 def test_brain_http_base_from_ws_url():

@@ -22,6 +22,7 @@ async def mac_client_socket(
 ) -> None:
     provided = extract_token(websocket.headers.get("x-jarvis-token"), websocket.headers.get("authorization")) or token
     if settings.auth_required and not tokens_match(provided, settings.jarvis_auth_token):
+        logger.warning("mac websocket rejected: token mismatch")
         await websocket.close(code=1008)
         return
 
