@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -40,12 +42,97 @@ APPLICATION_ALIASES = {
     "notion": "Notion",
     "cursor": "Cursor",
     "mail": "Mail",
+    "messages": "Messages",
+    "photos": "Photos",
+    "music": "Music",
+    "maps": "Maps",
+    "facetime": "FaceTime",
+    "calendar": "Calendar",
+    "reminders": "Reminders",
+    "preview": "Preview",
+    "textedit": "TextEdit",
+    "text edit": "TextEdit",
+    "xcode": "Xcode",
+    "figma": "Figma",
+    "postman": "Postman",
+    "docker": "Docker",
+    "telegram": "Telegram",
+    "signal": "Signal",
+    "brave": "Brave Browser",
+    "arc": "Arc",
+    "system settings": "System Settings",
+    "settings": "System Settings",
+    "app store": "App Store",
+}
+
+
+_APP_SMALL_WORDS = frozenset({"and", "of", "the", "for"})
+
+PROJECT_KIND_ALIASES = {
+    "node": "node",
+    "nodejs": "node",
+    "node js": "node",
+    "not just": "node",
+    "no js": "node",
+    "javascript": "node",
+    "js": "node",
+    "python": "python",
+    "django": "python",
+    "flask": "python",
+    "react": "react",
+    "reactjs": "react",
+    "react js": "react",
+    "next": "next",
+    "nextjs": "next",
+    "next js": "next",
+    "vue": "vue",
+    "vuejs": "vue",
+    "vue js": "vue",
+    "html": "html",
+    "website": "html",
+    "web": "html",
+    "web app": "html",
+    "go": "go",
+    "golang": "go",
+    "rust": "rust",
+    "java": "java",
+    "typescript": "typescript",
+    "type script": "typescript",
+    "ts": "typescript",
+    "angular": "angular",
 }
 
 
 def resolve_application_alias(name: str) -> str:
     key = " ".join(name.strip().lower().replace("_", " ").replace("-", " ").split())
     return APPLICATION_ALIASES.get(key, name.strip())
+
+
+def canonical_application_name(name: str) -> str:
+    stripped = (name or "").strip()
+    if not stripped:
+        return stripped
+    aliased = resolve_application_alias(stripped)
+    if is_known_application(stripped):
+        return aliased
+    parts = stripped.split()
+    titled: list[str] = []
+    for index, part in enumerate(parts):
+        low = part.lower()
+        if index > 0 and low in _APP_SMALL_WORDS:
+            titled.append(low)
+        else:
+            titled.append(part[:1].upper() + part[1:] if part else part)
+    return " ".join(titled)
+
+
+def normalize_project_kind(value: str) -> str:
+    key = re.sub(r"[.\-]+", " ", (value or "").strip().lower())
+    key = " ".join(key.split())
+    if key in PROJECT_KIND_ALIASES:
+        return PROJECT_KIND_ALIASES[key]
+    compact = re.sub(r"[^a-z0-9]+", "", key)
+    return PROJECT_KIND_ALIASES.get(compact, "generic")
 
 
 def is_known_application(name: str) -> bool:
@@ -63,7 +150,7 @@ class OpenApplicationArgs(BaseModel):
     @field_validator("application")
     @classmethod
     def _canonical(cls, value: str) -> str:
-        resolved = resolve_application_alias(value)
+        resolved = canonical_application_name(value)
         if not resolved:
             raise ValueError("application name is required")
         return resolved
@@ -95,6 +182,63 @@ class OpenPathArgs(PathArgs):
     @field_validator("application")
     @classmethod
     def _open_with(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not str(value).strip():
+            return None
+        return resolve_application_alias(value)
+
+
+def slugify_project_name(value: str) -> str:
+    cleaned = " ".join((value or "").strip().lower().split())
+    cleaned = re.sub(r"[^a-z0-9]+", "-", cleaned).strip("-")
+    return (cleaned or "app")[:64]
+
+
+class OpenUrlArgs(BaseModel):
+    url: str = Field(min_length=8, max_length=2048)
+
+    @field_validator("url")
+    @classmethod
+    def _url(cls, value: str) -> str:
+        from server.safety.policy import url_is_allowed
+
+        cleaned = value.strip()
+        if not url_is_allowed(cleaned):
+            raise ValueError("url must be a normal http or https page")
+        return cleaned
+
+
+class CreateProjectArgs(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    kind: str = Field(default="node", min_length=1, max_length=32)
+    open_in: Optional[str] = Field(default="Visual Studio Code", max_length=128)
+    path: Optional[str] = Field(default=None, max_length=512)
+
+    @field_validator("kind")
+    @classmethod
+    def _kind(cls, value: str) -> str:
+        return normalize_project_kind(value)
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, value: str) -> str:
+        slug = slugify_project_name(value)
+        if not slug:
+            raise ValueError("project name is required")
+        return slug
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not str(value).strip():
+            return None
+        cleaned = value.strip()
+        if "\x00" in cleaned:
+            raise ValueError("path must be a non-empty string")
+        return cleaned
+
+    @field_validator("open_in")
+    @classmethod
+    def _editor(cls, value: Optional[str]) -> Optional[str]:
         if value is None or not str(value).strip():
             return None
         return resolve_application_alias(value)
@@ -135,7 +279,7 @@ class RunTerminalArgs(BaseModel):
 
 OPEN_APPLICATION = ToolSpec(
     name="open_application",
-    description="Open an installed application by canonical name.",
+    description="Open any installed application by name. Unknown names are tried as written.",
     allowed_targets=("windows", "mac"),
     risk="low",
     requires_confirmation=False,
@@ -149,6 +293,15 @@ OPEN_PATH = ToolSpec(
     risk="low",
     requires_confirmation=False,
     args_model=OpenPathArgs,
+)
+
+OPEN_URL = ToolSpec(
+    name="open_url",
+    description="Open an http(s) page in the default browser. Use for YouTube, Google search, or a normal website.",
+    allowed_targets=("windows", "mac"),
+    risk="low",
+    requires_confirmation=False,
+    args_model=OpenUrlArgs,
 )
 
 LIST_DIRECTORY = ToolSpec(
@@ -167,6 +320,18 @@ GET_SYSTEM_INFO = ToolSpec(
     risk="low",
     requires_confirmation=False,
     args_model=EmptyArgs,
+)
+
+CREATE_PROJECT = ToolSpec(
+    name="create_project",
+    description=(
+        "Scaffold a starter project under the projects folder and optionally open it in VS Code. "
+        "kind: node, python, react, next, vue, html, go, rust, java, typescript, angular, or generic."
+    ),
+    allowed_targets=("windows", "mac"),
+    risk="low",
+    requires_confirmation=False,
+    args_model=CreateProjectArgs,
 )
 
 CREATE_FOLDER = ToolSpec(
@@ -221,6 +386,8 @@ REMEMBER_PREFERENCE = ToolSpec(
 DEFAULT_TOOLS = (
     OPEN_APPLICATION,
     OPEN_PATH,
+    OPEN_URL,
+    CREATE_PROJECT,
     LIST_DIRECTORY,
     GET_SYSTEM_INFO,
     CREATE_FOLDER,

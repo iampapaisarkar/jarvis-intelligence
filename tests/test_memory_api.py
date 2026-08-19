@@ -90,7 +90,7 @@ def test_create_folder_bare_name_uses_projects_dir(client, fake_llm):
     response = client.post(
         "/v1/intent",
         headers=_headers(),
-        json={"text": "Create a React project called TestApp.", "session_id": "mem-2", "target": "windows"},
+        json={"text": "Create a folder called TestApp.", "session_id": "mem-2", "target": "windows"},
     )
     body = response.json()
     assert body["type"] == "confirmation_required"

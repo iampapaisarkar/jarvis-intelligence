@@ -7,6 +7,8 @@ def test_default_registry_names_are_stable():
     assert registry.names() == [
         "open_application",
         "open_path",
+        "open_url",
+        "create_project",
         "list_directory",
         "get_system_info",
         "create_folder",
@@ -15,7 +17,7 @@ def test_default_registry_names_are_stable():
         "run_terminal",
         "remember_preference",
     ]
-    assert len(registry) == 9
+    assert len(registry) == 11
 
 
 def test_unknown_tool_is_rejected():
@@ -33,6 +35,7 @@ def test_open_application_aliases_vscode():
     assert args["application"] == "Visual Studio Code"
     assert resolve_application_alias("VS Code") == "Visual Studio Code"
     assert resolve_application_alias("slack") == "Slack"
+    assert resolve_application_alias("messages") == "Messages"
 
 
 def test_open_path_optional_editor():

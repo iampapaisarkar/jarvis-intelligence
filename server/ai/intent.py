@@ -308,8 +308,12 @@ def _default_spoken(spec: ToolSpec, arguments: dict[str, Any], target: str) -> s
         app = arguments.get("application")
         path = arguments.get("path", "that folder")
         return f"Opening {path} in {app}." if app else f"Opening {path}."
+    if spec.name == "open_url":
+        return "Opening that in your browser."
     if spec.name == "list_directory":
         return f"Listing {arguments.get('path', 'that folder')}."
+    if spec.name == "create_project":
+        return f"Creating {arguments.get('kind', 'node')} project {arguments.get('name')}."
     if spec.name == "create_folder":
         return f"I can create {arguments.get('path', 'that folder')} on {target} after confirmation."
     if spec.name == "create_file":

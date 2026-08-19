@@ -14,6 +14,7 @@ from server.safety.policy import (
     denied_spoken,
     is_ambiguous_path,
     is_system_path,
+    url_is_allowed,
 )
 from server.tools.base import Target, ToolSpec
 from server.tools.registry import ToolRegistry
@@ -230,6 +231,10 @@ class SafetyEngine:
             if app and application_is_forbidden(app):
                 return "blocked_executable"
 
+        if spec.name == "open_url":
+            if not url_is_allowed(str(arguments.get("url") or "")):
+                return "blocked_url"
+
         if spec.name == "remember_preference":
             key = str(arguments.get("key") or "")
             value = str(arguments.get("value") or "")
@@ -299,10 +304,14 @@ def _allowed_spoken(spec: ToolSpec, target: str, arguments: dict[str, Any]) -> s
         if app:
             return f"Opening {path} in {app}."
         return f"Opening {path}."
+    if spec.name == "open_url":
+        return "Opening that in your browser."
     if spec.name == "list_directory":
         return f"Listing {arguments.get('path', 'that folder')}."
     if spec.name == "get_system_info":
         return f"I'll check system info on {target}."
+    if spec.name == "create_project":
+        return f"Creating {arguments.get('kind', 'node')} project {arguments.get('name')}."
     if spec.name == "create_folder":
         return f"Creating {arguments.get('path')} on {target}."
     if spec.name == "create_file":

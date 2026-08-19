@@ -17,7 +17,9 @@ from server.tools.apps import LaunchFn, app_argv, launch_app, path_argv
 from server.tools.base import Target, ToolSpec
 from server.tools.paths import ToolExecutionError, resolve_user_path, user_home, workspace_root
 from server.tools.registry import ToolRegistry
+from server.tools.scaffold import write_project
 from server.tools.terminal import safe_argv
+from server.tools.web import url_argv
 from server.utils.logger import get_logger
 
 logger = get_logger("jarvis.tools")
@@ -100,10 +102,14 @@ class LocalToolExecutor:
             return self._open_application(arguments)
         if spec.name == "open_path":
             return self._open_path(target, arguments)
+        if spec.name == "open_url":
+            return self._open_url(arguments)
         if spec.name == "list_directory":
             return self._list_directory(target, arguments)
         if spec.name == "get_system_info":
             return self._system_info(target)
+        if spec.name == "create_project":
+            return self._create_project(target, arguments)
         if spec.name == "create_folder":
             return self._create_folder(target, arguments)
         if spec.name == "create_file":
@@ -119,6 +125,46 @@ class LocalToolExecutor:
         argv = app_argv(application, backend=self.backend)
         launch_app(argv, launch=self._launch)
         return {"application": application, "argv": argv}, f"Opening {application}."
+
+    def _open_url(self, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        url = str(arguments.get("url") or "")
+        if self.backend == "windows" and self._launch is None:
+            os.startfile(url)  # type: ignore[attr-defined]
+            argv = [url]
+        else:
+            argv = url_argv(url, backend=self.backend)
+            launch_app(argv, launch=self._launch)
+        return {"url": url, "argv": argv}, "Opening that in your browser."
+
+    def _create_project(self, target: Target, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        name = str(arguments.get("name") or "app")
+        kind = str(arguments.get("kind") or "node").strip().lower()
+        raw_path = str(arguments.get("path") or name)
+        folder = resolve_user_path(
+            raw_path,
+            self._settings,
+            target=target,
+            must_exist=False,
+            destructive=False,
+        )
+        if folder.exists() and not folder.is_dir():
+            raise ToolExecutionError("That path already exists and is not a folder.")
+        written = write_project(folder, name, kind)
+        editor = str(arguments.get("open_in") or "").strip()
+        argv: list[str] = []
+        if editor:
+            argv = path_argv(str(folder), application=editor, backend=self.backend)
+            launch_app(argv, launch=self._launch)
+            spoken = f"Created {name} and opened it in {editor}."
+        else:
+            spoken = f"Created the {kind} project {name}."
+        return {
+            "name": name,
+            "kind": kind,
+            "path": str(folder),
+            "written": written,
+            "argv": argv,
+        }, spoken
 
     def _open_path(self, target: Target, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
         path = resolve_user_path(

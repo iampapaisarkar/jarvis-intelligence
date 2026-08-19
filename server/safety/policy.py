@@ -221,3 +221,24 @@ def application_is_forbidden(name: str) -> bool:
     ):
         return True
     return False
+
+
+def url_is_allowed(url: str) -> bool:
+    from urllib.parse import urlparse
+
+    text = (url or "").strip()
+    if not text or len(text) > 2048 or "\x00" in text:
+        return False
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    if parsed.username or parsed.password:
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host or host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+        return False
+    if ":" in host:
+        return False
+    if re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host):
+        return False
+    return "." in host

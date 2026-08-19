@@ -5,6 +5,7 @@ from server.safety.policy import (
     command_is_forbidden,
     is_system_path,
     normalize_path,
+    url_is_allowed,
 )
 from server.tools.catalog import default_registry
 from server.safety.confirm import ConfirmationStore
@@ -43,6 +44,13 @@ def test_forbidden_commands():
 def test_downloaded_exe_is_forbidden_app():
     assert application_is_forbidden(r"C:\Users\foo\Downloads\setup.exe")
     assert application_is_forbidden("Visual Studio Code") is False
+
+
+def test_web_urls_must_be_http_https():
+    assert url_is_allowed("https://www.youtube.com/results?search_query=xyz")
+    assert url_is_allowed("javascript:alert(1)") is False
+    assert url_is_allowed("file:///etc/passwd") is False
+    assert url_is_allowed("https://localhost/admin") is False
 
 
 def test_classify_yes_no_bangla():

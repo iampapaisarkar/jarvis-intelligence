@@ -42,8 +42,8 @@ DEFAULT_PATH_ALIASES = (
 DEFAULT_PROJECTS_DIRECTORY = "~/Projects"
 
 BRAIN_LOCAL_TOOLS = frozenset({"remember_preference"})
-PATH_TOOLS = frozenset({"list_directory", "create_folder", "create_file", "delete_path", "open_path"})
-PROJECT_PARENT_TOOLS = frozenset({"create_folder", "create_file", "open_path"})
+PATH_TOOLS = frozenset({"list_directory", "create_folder", "create_file", "delete_path", "open_path", "create_project"})
+PROJECT_PARENT_TOOLS = frozenset({"create_folder", "create_file", "open_path", "create_project"})
 OWNER_SETTING_MAP = (
     ("jarvis_owner_name", "owner_name"),
     ("jarvis_owner_email", "owner_email"),

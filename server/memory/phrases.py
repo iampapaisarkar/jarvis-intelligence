@@ -78,11 +78,11 @@ _QUERY = (
     (re.compile(r"\b(?:what(?:'s| is)|tell me)\s+my\s+(?:phone|mobile)(?:\s+number)?\b", re.I), "owner_phone"),
     (re.compile(r"\b(?:what(?:'s| is)|tell me)\s+my\s+address\b", re.I), "owner_address"),
     (
-        re.compile(r"\b(?:what(?:'s| is)|who is|tell me)\s+my\s+(?:wife|spouse)(?:'s\s+name)?\b", re.I),
+        re.compile(r"\b(?:what(?:'s| is)|who is|tell me)?\s*my\s+(?:wife|spouse)(?:'s)?\s*name\b", re.I),
         "spouse_name",
     ),
     (
-        re.compile(r"\b(?:what(?:'s| is)|who is|tell me)\s+my\s+(?:son|child|boy)(?:'s\s+name)?\b", re.I),
+        re.compile(r"\b(?:what(?:'s| is)|who is|tell me)?\s*my\s+(?:son|child|boy)(?:'s)?\s*name\b", re.I),
         "child_name",
     ),
 )

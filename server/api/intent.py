@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from server.ai.compound import parse_compound_opens
+from server.ai.compound import parse_compound_opens, parse_create_project, parse_open_web
 from server.ai.intent import IntentParser, ParsedIntent
 from server.api.schemas import (
     ConfirmRequest,
@@ -277,7 +277,15 @@ async def parse_intent(
             )
         )
 
-    plan = parse_compound_opens(
+    plan = parse_open_web(
+        body.text,
+        target=body.target or settings.jarvis_default_target,
+        session_id=session_id,
+    ) or parse_create_project(
+        body.text,
+        target=body.target or settings.jarvis_default_target,
+        session_id=session_id,
+    ) or parse_compound_opens(
         body.text,
         target=body.target or settings.jarvis_default_target,
         session_id=session_id,

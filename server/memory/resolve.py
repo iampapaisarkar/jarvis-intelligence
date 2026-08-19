@@ -8,7 +8,7 @@ from typing import Any
 from server.ai.intent import ParsedIntent
 from server.memory.keys import PATH_TOOLS, PROJECT_PARENT_TOOLS
 from server.memory.store import MemoryStore
-from server.tools.catalog import resolve_application_alias
+from server.tools.catalog import canonical_application_name, resolve_application_alias
 
 
 def is_bare_name(path: str) -> bool:
@@ -33,6 +33,8 @@ def enrich_intent(intent: ParsedIntent, memory: MemoryStore) -> ParsedIntent:
         app = arguments.get("application")
         path = arguments.get("path", "that folder")
         spoken = f"Opening {path} in {app}." if app else f"Opening {path}."
+    elif intent.tool == "create_project":
+        spoken = f"Creating {arguments.get('kind', 'node')} project {arguments.get('name')}."
     elif intent.tool in PATH_TOOLS and "path" in arguments:
         spoken = intent.spoken_reply.replace(str(intent.arguments.get("path") or ""), str(arguments["path"]), 1)
     return replace(intent, arguments=arguments, message=spoken, spoken_reply=spoken)
@@ -42,20 +44,26 @@ def enrich_arguments(tool: str, arguments: dict[str, Any], memory: MemoryStore) 
     updated = dict(arguments)
     if tool == "open_application":
         raw = str(updated.get("application") or "")
-        resolved = memory.resolve_application(raw) or resolve_application_alias(raw)
+        resolved = memory.resolve_application(raw) or canonical_application_name(raw)
         if resolved:
             updated["application"] = resolved
     if tool == "open_path":
         raw_app = updated.get("application")
         if isinstance(raw_app, str) and raw_app.strip():
             updated["application"] = memory.resolve_application(raw_app) or resolve_application_alias(raw_app)
+    if tool == "create_project":
+        from server.tools.catalog import slugify_project_name
+
+        name = slugify_project_name(str(updated.get("name") or "app"))
+        updated["name"] = name
+        if not str(updated.get("path") or "").strip():
+            updated["path"] = name
+        raw_app = updated.get("open_in")
+        if isinstance(raw_app, str) and raw_app.strip():
+            updated["open_in"] = memory.resolve_application(raw_app) or resolve_application_alias(raw_app)
     if tool in PATH_TOOLS and "path" in updated:
         updated["path"] = memory.resolve_path(
             str(updated["path"]),
             join_projects=tool in PROJECT_PARENT_TOOLS,
         )
-    if tool == "remember_preference":
-        key = str(updated.get("key") or "").strip().lower()
-        updated["key"] = key
-        updated["value"] = str(updated.get("value") or "").strip()
     return updated

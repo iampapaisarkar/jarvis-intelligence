@@ -47,8 +47,10 @@ Rules:
 - If no allowed tool fits, use type reply explaining you cannot do that yet.
 - target defaults to "{default_target}" unless the user names Mac or Windows.
 - Banglish example: "VS Code ta open kore dao." → tool open_application, arguments.application "Visual Studio Code".
-- Normalize app nicknames: vscode/vs code/code → Visual Studio Code; chrome → Google Chrome; slack → Slack.
-- To open a project folder in an editor, use open_path with path (folder name is fine) and application "Visual Studio Code".
+- Normalize app nicknames: vscode/vs code/code → Visual Studio Code; chrome → Google Chrome; slack → Slack. Any other installed app name is also valid for open_application.
+- To scaffold an app, use create_project with name and kind (node, python, react, next, vue, html, go, rust, java, typescript, or generic).
+- Play or open a song/video on YouTube → tool open_url with a YouTube search URL.
+- Search the web → open_url with a Google search URL.
 - If the user states a lasting personal fact (name, email, phone, address, wife, son) or preference, use remember_preference with the matching allowed key.
 - A new folder/file with only a name should use that projects directory as the parent path.
 - If asked two actions such as open Slack and open a project, still emit one JSON for the first action only; the server may expand compound opens.

@@ -29,6 +29,8 @@ def test_extract_personal_facts():
     assert by_key["spouse_name"] == "Megha"
     assert by_key["child_name"] == "Pritth"
     assert extract_personal_query("What is my email?") == "owner_email"
+    assert extract_personal_query("And my wife name") == "spouse_name"
+    assert extract_personal_query("What is my son name?") == "child_name"
     assert "iampapaisarkar@gmail.com" in recall_spoken("owner_email", "iampapaisarkar@gmail.com")
 
 
@@ -93,6 +95,28 @@ def test_enrich_create_folder_uses_projects_parent(tmp_path):
         assert enriched.arguments["path"] == "~/Projects/TestApp"
         assert is_bare_name("TestApp") is True
         assert is_bare_name("~/Projects/TestApp") is False
+    finally:
+        store.close()
+
+
+def test_enrich_create_project_uses_projects_parent(tmp_path):
+    store = MemoryStore(tmp_path / "mem.sqlite")
+    try:
+        intent = ParsedIntent(
+            type="tool_call",
+            message="Creating demo user.",
+            spoken_reply="Creating demo user.",
+            session_id="s",
+            tool="create_project",
+            target="mac",
+            arguments={"name": "demo user", "kind": "node", "open_in": "Visual Studio Code"},
+            risk="low",
+            requires_confirmation=False,
+        )
+        enriched = enrich_intent(intent, store)
+        assert enriched.arguments["name"] == "demo-user"
+        assert enriched.arguments["path"] == "~/Projects/demo-user"
+        assert enriched.arguments["open_in"] == "Visual Studio Code"
     finally:
         store.close()
 
