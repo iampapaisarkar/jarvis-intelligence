@@ -12,6 +12,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from server import __version__
 from server.config import get_settings
+from server.discovery import DEFAULT_DISCOVERY_PORT, discover_brain
 from server.mac.protocol import ALLOWED_FROM_BRAIN, ErrorMessage, ToolRequestMessage
 from server.utils.logger import get_logger, setup_logging
 
@@ -39,16 +40,29 @@ def _connect(url: str, token: str):
 
 async def run_client(
     *,
-    url: str,
+    url: str | None,
     token: str,
     runner: MacToolRunner,
     once: bool = False,
+    discover: bool = False,
+    discovery_port: int = DEFAULT_DISCOVERY_PORT,
 ) -> None:
-    target = _with_token_query(url, token)
     hostname = socket.gethostname()[:128]
     delay = 2.0
     while True:
         try:
+            target_url = url
+            if discover or not target_url:
+                found = await asyncio.to_thread(discover_brain, port=discovery_port)
+                if not found:
+                    logger.error("no Jarvis brain found on the LAN; is Windows running?")
+                    if once:
+                        return
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 2, 30.0)
+                    continue
+                target_url = found
+            target = _with_token_query(target_url, token)
             async with _connect(target, token) as ws:
                 delay = 2.0
                 await ws.send(
@@ -131,7 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--url",
         default=None,
-        help="Brain WebSocket URL (default: ws://127.0.0.1:8765/v1/mac)",
+        help="Brain WebSocket URL. Omit to auto-discover the Windows brain on the LAN.",
     )
     parser.add_argument("--token", default=None, help="Shared JARVIS_AUTH_TOKEN")
     parser.add_argument("--once", action="store_true", help="Exit after the first disconnect")
@@ -155,7 +169,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     args = build_parser().parse_args(argv)
     settings = get_settings()
     setup_logging(settings)
-    url = args.url or "ws://127.0.0.1:8765/v1/mac"
+    url = args.url
+    discover = url is None or url.strip().lower() in {"auto", "discover"}
+    if discover:
+        url = None
     token = args.token or settings.jarvis_auth_token
     if not token:
         print("Missing auth token. Pass --token or set JARVIS_AUTH_TOKEN.", file=sys.stderr)
@@ -163,11 +180,32 @@ def main(argv: Optional[list[str]] = None) -> None:
     runner = MacToolRunner(settings)
 
     async def _run() -> None:
-        tasks = [asyncio.create_task(run_client(url=url, token=token, runner=runner, once=args.once))]
+        tasks = [
+            asyncio.create_task(
+                run_client(
+                    url=url,
+                    token=token,
+                    runner=runner,
+                    once=args.once,
+                    discover=discover,
+                    discovery_port=settings.jarvis_discovery_port,
+                )
+            )
+        ]
         if args.wake:
             from mac_client.wake import brain_http_base, run_wake_loop
 
-            http_base = (args.http_url or brain_http_base(url)).rstrip("/")
+            wake_url = url
+            if discover or not wake_url:
+                found = await asyncio.to_thread(
+                    discover_brain, port=settings.jarvis_discovery_port
+                )
+                if found:
+                    wake_url = found
+            if not wake_url:
+                logger.error("wake loop waiting for brain discovery")
+                wake_url = "ws://127.0.0.1:8765/v1/mac"
+            http_base = (args.http_url or brain_http_base(wake_url)).rstrip("/")
             tasks.append(
                 asyncio.create_task(
                     run_wake_loop(

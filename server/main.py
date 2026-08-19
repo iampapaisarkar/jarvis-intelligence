@@ -19,6 +19,7 @@ from server.ai.llm import LLMError
 from server.ai.stt import STTError
 from server.ai.tts import TTSError
 from server.config import get_settings
+from server.discovery import DiscoveryServer
 from server.dependencies import (
     get_llm_engine,
     get_memory_store,
@@ -66,7 +67,20 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
             tts.load()
         except TTSError as exc:
             logger.error("TTS preload failed: %s", exc)
+    discovery: DiscoveryServer | None = None
+    if settings.jarvis_discovery_enabled:
+        discovery = DiscoveryServer(
+            listen_port=settings.jarvis_discovery_port,
+            ws_port=settings.jarvis_port,
+        )
+        try:
+            discovery.start()
+        except OSError as exc:
+            logger.error("Discovery UDP bind failed: %s", exc)
+            discovery = None
     yield
+    if discovery is not None:
+        discovery.stop()
     llm.shutdown()
     stt.shutdown()
     tts.shutdown()

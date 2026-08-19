@@ -179,6 +179,14 @@ python -m uvicorn server.main:app --host 0.0.0.0 --port 8765
 
 The first `/v1/chat` request loads the model (often 10–60 seconds on an i3). Set `LLM_PRELOAD=true` in `.env` to load at startup instead.
 
+Allow the LAN once (Windows Firewall, **Private** network). Run PowerShell **as Administrator**:
+
+```powershell
+.\scripts\allow_lan.ps1
+```
+
+That opens TCP **8765** (WebSocket) and UDP **8766** (auto-find the brain). You do not look up the Windows IP after that.
+
 ### 7. Health check
 
 ```powershell
@@ -306,16 +314,22 @@ python -m pytest tests -q
 On the Mac body (same machine for development, or another Mac on the LAN against the Windows brain):
 
 ```bash
-python -m mac_client --url ws://127.0.0.1:8765/v1/mac --token change-me
+python -m mac_client --token change-me
 ```
 
-Wake word on this Mac's microphone (sends short WAV clips to the brain; `/v1/listen` remains push-to-talk):
+Omit `--url` and the client finds the Windows brain on the LAN. Allow **UDP 8766** inbound on Windows (Private network), same as TCP 8765. To pin an address instead:
 
 ```bash
-python -m mac_client --url ws://127.0.0.1:8765/v1/mac --token change-me --wake
+python -m mac_client --url ws://192.168.1.23:8765/v1/mac --token change-me
 ```
 
-Use the Windows LAN IP instead of `127.0.0.1` when the brain is a separate laptop. The client re-checks tools and paths locally; it does not blindly execute network payloads.
+Wake word on this Mac's microphone:
+
+```bash
+python -m mac_client --token change-me --wake
+```
+
+The client re-checks tools and paths locally; it does not blindly execute network payloads.
 
 ---
 

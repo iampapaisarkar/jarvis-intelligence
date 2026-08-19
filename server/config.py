@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     jarvis_memory_history_limit: int = 200
     jarvis_wake_enabled: bool = True
     jarvis_wake_word: str = "jarvis"
+    jarvis_discovery_enabled: bool = True
+    jarvis_discovery_port: int = 8766
 
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
@@ -172,6 +174,13 @@ class Settings(BaseSettings):
         if len(cleaned) < 2 or len(cleaned) > 32:
             raise ValueError("JARVIS_WAKE_WORD must be between 2 and 32 characters")
         return cleaned
+
+    @field_validator("jarvis_discovery_port")
+    @classmethod
+    def _discovery_port(cls, value: int) -> int:
+        if value < 1024 or value > 65535:
+            raise ValueError("JARVIS_DISCOVERY_PORT must be between 1024 and 65535")
+        return value
 
     def resolve_path(self, path: Path) -> Path:
         if path.is_absolute():
