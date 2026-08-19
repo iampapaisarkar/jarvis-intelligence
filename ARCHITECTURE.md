@@ -159,7 +159,7 @@ The LLM may only name tools that exist in the registry.
 
 ## Memory
 
-SQLite (Phase 8) stores preferences, aliases, known apps, project locations, and short task history. Example: `default_projects_directory = ~/Projects`.
+SQLite (Phase 8) stores allowlisted preferences, aliases, known apps, project locations, and short task history. Example: `default_projects_directory = ~/Projects`. The database is local (`data/jarvis.sqlite` by default). Secrets, tokens, and passwords are not accepted as keys.
 
 ## Logging
 
@@ -176,7 +176,7 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 | **5** | Safety engine, risk levels, confirmation, command policy | **complete** (see issues below) |
 | **6** | Windows tools (apps, filesystem, safe terminal) | **complete** (see issues below) |
 | **7** | Mac client (WebSocket, auth, macOS tool executor) | **complete** (see issues below) |
-| 8 | SQLite memory (preferences, history, aliases) | not started |
+| **8** | SQLite memory (preferences, history, aliases) | **complete** (see issues below) |
 | 9 | Wake word "Jarvis" with push-to-talk fallback | not started |
 
 Do not start the next phase until the current phase is tested.
@@ -331,6 +331,27 @@ Verified on macOS arm64 / Python 3.12: 105 tests passed. Live `WS /v1/mac` conne
 4. **Not proven on a separate Windows brain + Mac body pair.** Live checks in this environment run both on the same Mac.
 5. **Timeouts return `mac_timeout`.** Default `JARVIS_MAC_TIMEOUT_SECONDS=20`.
 
+## Phase 8 detail
+
+Phase 8 proves the brain can remember a few facts locally:
+
+1. SQLite at `JARVIS_MEMORY_PATH` (default `data/jarvis.sqlite`) using stdlib `sqlite3`. No SQLAlchemy.
+2. Allowlisted preferences (`default_projects_directory`, `preferred_language`, `address_as`), path/application aliases, and a capped task history.
+3. `"My projects are normally inside ~/Projects."` is captured without the LLM. `remember_preference` is also in the catalog.
+4. Bare folder/file names are joined to `default_projects_directory` before safety. Path aliases cover Downloads/Documents/Desktop/Projects.
+5. Successful `open_application` names are learned as aliases. Memory tools always run on the brain, not the Mac.
+6. Health reports `memory.ok` plus counts. CRUD lives at `/v1/memory/*`.
+
+## Phase 8 issues (open)
+
+Verified on macOS arm64 / Python 3.12: 119 tests passed. Live `POST /v1/intent` `"My projects are normally inside ~/Projects."` returned `remember_preference` with `executed: true` and `reason: remembered` without loading the GGUF. Health reports version `0.8.0`, 8 tools, `memory.ok: true` (1 preference, 4 path aliases). `GET /v1/memory/history` showed that task.
+
+1. **Allowlisted keys only.** Arbitrary facts, conversation summaries, and secrets are not stored.
+2. **History is short.** Default 200 rows; arguments are truncated. This is not a full chat log.
+3. **Path expansion is lexical.** `~/Projects/TestApp` is still confirmed before create.
+4. **Not proven on the Windows i3.**
+5. **The 1.5B model may still reply instead of calling `remember_preference`.** The projects-directory phrase is handled by a matcher so that example works anyway.
+
 
 ## Runtime layout (target)
 
@@ -340,9 +361,11 @@ JARVIS/
 │   ├── ai/          # LLM, STT, TTS, intent parser
 │   ├── tools/       # registry + local executor (Windows/posix)
 │   ├── safety/      # policy, confirmation store
+│   ├── memory/      # SQLite preferences, aliases, history
 │   ├── mac/         # WebSocket bridge to the Mac body
 │   └── api/
 ├── mac_client/      # macOS body (Phase 7)
+├── data/            # local SQLite (gitignored db files)
 ├── models/          # local GGUF / Whisper / Piper files (gitignored binaries)
 ├── scripts/         # Windows setup and health
 └── tests/

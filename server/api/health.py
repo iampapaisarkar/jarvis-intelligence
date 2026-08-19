@@ -4,17 +4,19 @@ from server import __version__
 from server.ai.llm import LLMEngine
 from server.ai.stt import SpeechToText
 from server.ai.tts import TextToSpeech
-from server.api.schemas import HealthResponse, LlmHealth, MacHealth, ModelHealth, SafetyHealth, ToolsHealth
+from server.api.schemas import HealthResponse, LlmHealth, MacHealth, MemoryHealth, ModelHealth, SafetyHealth, ToolsHealth
 from server.config import Settings, get_settings
 from server.dependencies import (
     get_confirmation_store,
     get_llm_engine,
     get_mac_bridge,
+    get_memory_store,
     get_stt_engine,
     get_tool_registry,
     get_tts_engine,
 )
 from server.mac.bridge import MacBridge
+from server.memory.store import MemoryStore
 from server.safety.confirm import ConfirmationStore
 from server.tools.executor import detect_backend
 from server.tools.registry import ToolRegistry
@@ -31,6 +33,7 @@ async def health(
     registry: ToolRegistry = Depends(get_tool_registry),
     store: ConfirmationStore = Depends(get_confirmation_store),
     bridge: MacBridge = Depends(get_mac_bridge),
+    memory: MemoryStore = Depends(get_memory_store),
 ) -> HealthResponse:
     llm_present = llm.model_file_present()
     stt_present = stt.model_file_present()
@@ -73,4 +76,5 @@ async def health(
             hostname=bridge.hostname,
             version=bridge.client_version,
         ),
+        memory=MemoryHealth(**memory.stats()),
     )

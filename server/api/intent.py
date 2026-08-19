@@ -5,7 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from server.ai.intent import IntentParser
+from server.ai.intent import IntentParser, ParsedIntent
 from server.api.schemas import (
     ConfirmRequest,
     IntentRequest,
@@ -20,11 +20,15 @@ from server.dependencies import (
     get_confirmation_store,
     get_intent_parser,
     get_mac_bridge,
+    get_memory_store,
     get_safety_engine,
     get_tool_executor,
     get_tool_registry,
 )
 from server.mac.bridge import MacBridge
+from server.memory.phrases import extract_remember_preference
+from server.memory.resolve import enrich_intent
+from server.memory.store import MemoryStore
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import GatedIntent, SafetyEngine
 from server.safety.phrases import classify_confirmation
@@ -143,6 +147,7 @@ async def confirm_action(
     registry: ToolRegistry = Depends(get_tool_registry),
     executor: LocalToolExecutor = Depends(get_tool_executor),
     bridge: MacBridge = Depends(get_mac_bridge),
+    memory: MemoryStore = Depends(get_memory_store),
 ) -> IntentResponse:
     pending = store.get(body.session_id, body.confirmation_id)
     if pending is None:
@@ -172,6 +177,7 @@ async def confirm_action(
             registry=registry,
             executor=executor,
             bridge=bridge,
+            memory=memory,
         )
     )
 
@@ -189,6 +195,8 @@ async def parse_intent(
     registry: ToolRegistry = Depends(get_tool_registry),
     executor: LocalToolExecutor = Depends(get_tool_executor),
     bridge: MacBridge = Depends(get_mac_bridge),
+    memory: MemoryStore = Depends(get_memory_store),
+    settings: Settings = Depends(get_settings),
 ) -> IntentResponse:
     session_id = body.session_id or str(uuid.uuid4())
     logger.info(
@@ -198,22 +206,40 @@ async def parse_intent(
         extra={"session_id": session_id},
     )
     handled = await _handle_spoken_confirmation(
-        body.text, session_id, store, engine, registry, executor, bridge
+        body.text, session_id, store, engine, registry, executor, bridge, memory
     )
     if handled is not None:
         return handled
 
-    parsed = await parser.parse(
-        body.text,
-        session_id=session_id,
-        default_target=body.target,
-    )
+    remembered = extract_remember_preference(body.text)
+    if remembered is not None:
+        spec = registry.require("remember_preference")
+        parsed_intent = ParsedIntent(
+            type="tool_call",
+            message=f"I'll remember {remembered['key']}.",
+            spoken_reply=f"I'll remember {remembered['key']}.",
+            session_id=session_id,
+            tool=spec.name,
+            target=body.target or settings.jarvis_default_target,  # type: ignore[arg-type]
+            arguments=remembered,
+            risk=spec.risk,
+            requires_confirmation=spec.requires_confirmation,
+        )
+    else:
+        parsed_intent = await parser.parse(
+            body.text,
+            session_id=session_id,
+            default_target=body.target,
+            memory_context=memory.prompt_context(),
+        )
+    parsed_intent = enrich_intent(parsed_intent, memory)
     return _response(
         await apply_execution(
-            engine.gate(parsed),
+            engine.gate(parsed_intent),
             registry=registry,
             executor=executor,
             bridge=bridge,
+            memory=memory,
         )
     )
 
@@ -226,6 +252,7 @@ async def _handle_spoken_confirmation(
     registry: ToolRegistry,
     executor: LocalToolExecutor,
     bridge: MacBridge,
+    memory: MemoryStore,
 ) -> IntentResponse | None:
     verdict = classify_confirmation(text)
     pending = store.get_for_session(session_id)
@@ -241,6 +268,7 @@ async def _handle_spoken_confirmation(
                 registry=registry,
                 executor=executor,
                 bridge=bridge,
+                memory=memory,
             )
         )
     if verdict == "no":

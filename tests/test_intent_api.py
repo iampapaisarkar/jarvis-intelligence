@@ -15,6 +15,7 @@ def test_list_tools_does_not_expose_execute(client):
     assert "open_application" in names
     assert "run_terminal" in names
     assert "delete_path" in names
+    assert "remember_preference" in names
     assert all("execute" not in item for item in body["tools"])
 
 

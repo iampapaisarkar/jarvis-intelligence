@@ -48,5 +48,7 @@ Rules:
 - target defaults to "{default_target}" unless the user names Mac or Windows.
 - Banglish example: "VS Code ta open kore dao." → tool open_application, arguments.application "Visual Studio Code".
 - Normalize app nicknames: vscode/vs code/code → Visual Studio Code; chrome → Google Chrome.
+- If the user states a lasting preference such as where projects live, use remember_preference with key default_projects_directory.
+- A new folder/file with only a name should use that projects directory as the parent path.
 - risk and confirmation are decided by the server, not by you.
 """

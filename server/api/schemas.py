@@ -34,6 +34,14 @@ class MacHealth(BaseModel):
     version: Optional[str] = None
 
 
+class MemoryHealth(BaseModel):
+    ok: bool = False
+    path: str = ""
+    preferences: int = 0
+    aliases: int = 0
+    history: int = 0
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     version: str
@@ -44,6 +52,7 @@ class HealthResponse(BaseModel):
     tools: ToolsHealth
     safety: SafetyHealth
     mac: MacHealth = Field(default_factory=MacHealth)
+    memory: MemoryHealth = Field(default_factory=MemoryHealth)
 
 
 class ChatMessage(BaseModel):

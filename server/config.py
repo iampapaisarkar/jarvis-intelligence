@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     jarvis_workspace: Optional[Path] = None
     jarvis_terminal_timeout_seconds: int = 10
     jarvis_mac_timeout_seconds: int = 20
+    jarvis_memory_path: Path = Path("data/jarvis.sqlite")
+    jarvis_memory_history_limit: int = 200
 
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
@@ -154,6 +156,13 @@ class Settings(BaseSettings):
             raise ValueError("JARVIS_MAC_TIMEOUT_SECONDS must be between 3 and 120")
         return value
 
+    @field_validator("jarvis_memory_history_limit")
+    @classmethod
+    def _memory_history(cls, value: int) -> int:
+        if value < 20 or value > 2000:
+            raise ValueError("JARVIS_MEMORY_HISTORY_LIMIT must be between 20 and 2000")
+        return value
+
     def resolve_path(self, path: Path) -> Path:
         if path.is_absolute():
             return path
@@ -207,6 +216,10 @@ class Settings(BaseSettings):
             if matches:
                 return matches[0]
         return path
+
+    @property
+    def memory_file(self) -> Path:
+        return self.resolve_path(self.jarvis_memory_path)
 
     @property
     def log_directory(self) -> Path:

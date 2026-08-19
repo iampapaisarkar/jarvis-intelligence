@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional
 
 from server.ai.intent import ParsedIntent
+from server.memory.keys import PATH_PREFERENCE_KEYS
 from server.safety.confirm import ConfirmationStore, PendingAction
 from server.safety.policy import (
     application_is_forbidden,
@@ -224,6 +225,12 @@ class SafetyEngine:
             if application_is_forbidden(app):
                 return "blocked_executable"
 
+        if spec.name == "remember_preference":
+            key = str(arguments.get("key") or "")
+            value = str(arguments.get("value") or "")
+            if key in PATH_PREFERENCE_KEYS and is_system_path(value, target, destructive=False):
+                return "blocked_system_path"
+
         return None
 
 
@@ -293,4 +300,6 @@ def _allowed_spoken(spec: ToolSpec, target: str, arguments: dict[str, Any]) -> s
         return f"Deleting {arguments.get('path')} on {target}."
     if spec.name == "run_terminal":
         return f"Running that command on {target}."
+    if spec.name == "remember_preference":
+        return f"I'll remember {arguments.get('key')}."
     return f"Planning {spec.name}."

@@ -12,6 +12,7 @@ from server.config import Settings, get_settings
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import SafetyEngine
 from server.mac.bridge import MacBridge
+from server.memory.store import MemoryStore
 from server.tools.catalog import default_registry
 from server.tools.executor import LocalToolExecutor
 from server.tools.registry import ToolRegistry
@@ -48,6 +49,12 @@ def get_confirmation_store() -> ConfirmationStore:
 @lru_cache
 def get_mac_bridge() -> MacBridge:
     return MacBridge(timeout_seconds=get_settings().jarvis_mac_timeout_seconds)
+
+
+@lru_cache
+def get_memory_store() -> MemoryStore:
+    settings = get_settings()
+    return MemoryStore(settings.memory_file, history_limit=settings.jarvis_memory_history_limit)
 
 
 def get_tool_executor(settings: Settings = Depends(get_settings)) -> LocalToolExecutor:
@@ -90,10 +97,16 @@ def reset_singletons() -> None:
         get_confirmation_store().clear()
     except Exception:
         pass
+    try:
+        if get_memory_store.cache_info().currsize > 0:
+            get_memory_store().close()
+    except Exception:
+        pass
     get_llm_engine.cache_clear()
     get_stt_engine.cache_clear()
     get_tts_engine.cache_clear()
     get_tool_registry.cache_clear()
     get_confirmation_store.cache_clear()
     get_mac_bridge.cache_clear()
+    get_memory_store.cache_clear()
     get_settings.cache_clear()

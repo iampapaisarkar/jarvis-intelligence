@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from server.config import Settings
+from server.memory.keys import BRAIN_LOCAL_TOOLS
 from server.safety.engine import GatedIntent
 from server.safety.policy import command_is_forbidden
 from server.tools.apps import LaunchFn, app_argv, launch_app
@@ -220,11 +221,23 @@ async def apply_execution(
     registry: ToolRegistry,
     executor: LocalToolExecutor,
     bridge: Any = None,
+    memory: Any = None,
 ) -> GatedIntent:
     if gated.type != "tool_call" or gated.safety != "allowed" or not gated.tool or not gated.target:
         return gated
     spec = registry.require(gated.tool)
-    if gated.target == "mac":
+    if spec.name in BRAIN_LOCAL_TOOLS:
+        if memory is None:
+            result = ToolResult(
+                ok=False,
+                executed=False,
+                spoken="Memory is not available.",
+                reason="memory_unavailable",
+            )
+        else:
+            ok, spoken, reason, data = memory.apply_remember(gated.arguments_or_empty)
+            result = ToolResult(ok=ok, executed=ok, spoken=spoken, reason=reason, data=data)
+    elif gated.target == "mac":
         if bridge is None:
             result = ToolResult(
                 ok=True,
@@ -245,7 +258,7 @@ async def apply_execution(
             arguments=gated.arguments_or_empty,
             session_id=gated.session_id,
         )
-    return GatedIntent(
+    updated = GatedIntent(
         type=gated.type,
         safety=gated.safety,
         message=result.spoken,
@@ -268,6 +281,21 @@ async def apply_execution(
         parse_recovered=gated.parse_recovered,
         result=result.data or None,
     )
+    if memory is not None:
+        memory.record_task(
+            session_id=updated.session_id,
+            tool=updated.tool,
+            target=updated.target,
+            arguments=updated.arguments_or_empty,
+            spoken=updated.spoken_reply,
+            reason=updated.reason,
+            executed=updated.executed,
+        )
+        if updated.executed and updated.tool == "open_application":
+            app = str(updated.arguments_or_empty.get("application") or "")
+            if app:
+                memory.set_alias(app, "application", app)
+    return updated
 
 
 def _planned(spec: ToolSpec, target: str, arguments: dict[str, Any]) -> str:

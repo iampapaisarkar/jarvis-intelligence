@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
+from server.memory.keys import ALLOWED_PREFERENCE_KEYS
 from server.tools.base import ToolSpec
 from server.tools.registry import ToolRegistry
 
@@ -68,6 +69,27 @@ class CreateFileArgs(PathArgs):
 
 class EmptyArgs(BaseModel):
     pass
+
+
+class RememberPreferenceArgs(BaseModel):
+    key: str = Field(min_length=1, max_length=64)
+    value: str = Field(min_length=1, max_length=512)
+
+    @field_validator("key")
+    @classmethod
+    def _key(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if cleaned not in ALLOWED_PREFERENCE_KEYS:
+            raise ValueError("unknown preference key")
+        return cleaned
+
+    @field_validator("value")
+    @classmethod
+    def _value(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("value is required")
+        return cleaned
 
 
 class RunTerminalArgs(BaseModel):
@@ -145,6 +167,15 @@ RUN_TERMINAL = ToolSpec(
     args_model=RunTerminalArgs,
 )
 
+REMEMBER_PREFERENCE = ToolSpec(
+    name="remember_preference",
+    description="Store a lasting preference. Allowed keys: default_projects_directory, preferred_language, address_as.",
+    allowed_targets=("windows", "mac"),
+    risk="low",
+    requires_confirmation=False,
+    args_model=RememberPreferenceArgs,
+)
+
 DEFAULT_TOOLS = (
     OPEN_APPLICATION,
     LIST_DIRECTORY,
@@ -153,6 +184,7 @@ DEFAULT_TOOLS = (
     CREATE_FILE,
     DELETE_PATH,
     RUN_TERMINAL,
+    REMEMBER_PREFERENCE,
 )
 
 

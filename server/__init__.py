@@ -1,3 +1,3 @@
-"""Jarvis Phase 7 — local offline brain with Mac-body WebSocket execution."""
+"""Jarvis Phase 8 — local offline brain with SQLite memory."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"

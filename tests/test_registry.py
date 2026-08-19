@@ -12,8 +12,9 @@ def test_default_registry_names_are_stable():
         "create_file",
         "delete_path",
         "run_terminal",
+        "remember_preference",
     ]
-    assert len(registry) == 7
+    assert len(registry) == 8
 
 
 def test_unknown_tool_is_rejected():

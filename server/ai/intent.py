@@ -106,6 +106,7 @@ class IntentParser:
         *,
         session_id: str,
         default_target: Optional[str] = None,
+        memory_context: str = "",
     ) -> ParsedIntent:
         user_text = text.strip()
         if not user_text:
@@ -119,6 +120,8 @@ class IntentParser:
             ChatTurn(role="system", content=self._system_prompt),
             ChatTurn(role="user", content=user_text),
         ]
+        if memory_context:
+            messages.insert(1, ChatTurn(role="system", content=memory_context))
         result, recovered = await self._complete(messages, session_id)
         try:
             data = extract_json_object(result.text)
@@ -309,4 +312,6 @@ def _default_spoken(spec: ToolSpec, arguments: dict[str, Any], target: str) -> s
         return f"I can create {arguments.get('path', 'that file')} on {target} after confirmation."
     if spec.name == "get_system_info":
         return f"I'll check system info on {target}."
+    if spec.name == "remember_preference":
+        return f"I'll remember {arguments.get('key')}."
     return f"Planning {spec.name}."

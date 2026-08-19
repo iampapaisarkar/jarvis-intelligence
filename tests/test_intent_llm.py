@@ -34,7 +34,7 @@ def test_local_gguf_plans_open_vscode_without_executing():
 
     settings = Settings(
         llm_model_path=model,
-        llm_n_ctx=1024,
+            llm_n_ctx=2048,
         llm_n_gpu_layers=0,
         intent_max_tokens=128,
         intent_temperature=0.1,

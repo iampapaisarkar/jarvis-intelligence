@@ -4,7 +4,7 @@ Local, offline personal voice assistant. The AI brain runs on a Windows laptop (
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 7** — local LLM + STT + TTS + intent + safety + Windows/posix tools + Mac WebSocket body.
+Current milestone: **Phase 8** — local LLM + STT + TTS + intent + safety + tools + Mac WebSocket body + SQLite memory.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
@@ -261,6 +261,17 @@ curl http://127.0.0.1:8765/v1/tools `
   -H "X-Jarvis-Token: change-me-to-a-long-random-string"
 ```
 
+### 8e. Local memory (SQLite)
+
+```powershell
+curl -X POST http://127.0.0.1:8765/v1/intent `
+  -H "Content-Type: application/json" `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string" `
+  -d "{\"text\":\"My projects are normally inside ~/Projects.\"}"
+```
+
+That stores `default_projects_directory`. A later `"Create a folder called TestApp"` is planned at `~/Projects/TestApp` (still confirmed before create). Preferences, aliases, and recent tasks also have `/v1/memory/*` CRUD.
+
 ### 9. Tests
 
 ```powershell
@@ -302,11 +313,11 @@ Use the Windows LAN IP instead of `127.0.0.1` when the brain is a separate lapto
 
 ---
 
-## API (Phase 7)
+## API (Phase 8)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | LLM + STT + TTS + tool + safety + Mac client state |
+| GET | `/health` | no | LLM + STT + TTS + tool + safety + Mac client + memory state |
 | POST | `/v1/chat` | token | Local chat completion |
 | POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
 | POST | `/v1/listen` | token | Microphone capture → transcript |
@@ -316,6 +327,10 @@ Use the Windows LAN IP instead of `127.0.0.1` when the brain is a separate lapto
 | GET | `/v1/pending` | token | Pending confirmation for a session |
 | POST | `/v1/confirm` | token | Approve or reject a pending action |
 | WS | `/v1/mac` | token | Mac body: hello, tool_request / tool_result |
+| GET | `/v1/memory` | token | Preference / alias / history counts |
+| GET/PUT/DELETE | `/v1/memory/preferences` | token | Allowlisted preferences |
+| GET/PUT/DELETE | `/v1/memory/aliases` | token | Application and path aliases |
+| GET | `/v1/memory/history` | token | Recent executed/deferred tasks |
 
 `POST /v1/chat` body:
 
@@ -340,12 +355,13 @@ Header: `X-Jarvis-Token: <JARVIS_AUTH_TOKEN>` or `Authorization: Bearer <token>`
 ```
 server/       FastAPI brain
 mac_client/   macOS body (WebSocket)
+data/         Local SQLite memory (db files gitignored)
 models/       Local model files (not in git)
 scripts/      Windows setup / start / health
 tests/        Unit + integration tests
 ```
 
-STT, TTS, intent, safety, local Windows/posix tools, and the Mac WebSocket client are implemented. Memory is documented in ARCHITECTURE.md.
+STT, TTS, intent, safety, local Windows/posix tools, the Mac WebSocket client, and SQLite memory are implemented. Wake word is documented in ARCHITECTURE.md.
 
 ---
 

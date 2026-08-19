@@ -31,3 +31,9 @@ models/**/*.onnx.data
 .idea/
 .vscode/
 *.swp
+
+# Local SQLite memory
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
+*.sqlite
