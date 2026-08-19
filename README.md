@@ -4,7 +4,7 @@ Local, offline personal voice assistant. The AI brain runs on a Windows laptop (
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 2** — local LLM + local Whisper STT.
+Current milestone: **Phase 3** — local LLM + Whisper STT + Piper TTS.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
@@ -19,7 +19,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issue
 | RAM | 8 GB (close other heavy apps while the model is loaded) |
 | GPU | Not required. Do not assume CUDA. |
 | Python | **3.11, 3.12, or 3.13** (64-bit). Avoid 3.14 until llama-cpp-python ships wheels for it. |
-| Disk | ~2.2 GB for the 1.5B GGUF + Whisper `ggml-base.bin` plus the Python venv |
+| Disk | ~2.3 GB for the 1.5B GGUF + Whisper `ggml-base.bin` + Piper ONNX plus the Python venv |
 
 Optional build tools (only if `pip` has to compile `llama-cpp-python`):
 
@@ -131,6 +131,23 @@ Then set `STT_MODEL_PATH=models/stt/ggml-tiny.bin` in `.env`.
 
 On Windows, `pywhispercpp` may need the same C++ Build Tools as llama-cpp-python. Microphone capture needs a working input device; WAV upload works without a mic.
 
+### 4c. Download the Piper TTS voice (needs internet once)
+
+Default: **en_US-lessac-low** (~63 MB ONNX, CPU).
+
+```powershell
+python scripts\download_model.py --tts
+```
+
+This writes:
+
+```
+models\tts\en_US-lessac-low.onnx
+models\tts\en_US-lessac-low.onnx.json
+```
+
+Piper has no official Bangla voice. For Bengali speech, install [espeak-ng](https://github.com/espeak-ng/espeak-ng) (`choco install espeak`) or set `TTS_BN_MODEL_PATH` to a local Bangla Piper ONNX.
+
 ### 5. Configure
 
 Edit `.env` (never commit it):
@@ -141,6 +158,7 @@ JARVIS_PORT=8765
 JARVIS_AUTH_TOKEN=change-me-to-a-long-random-string
 LLM_MODEL_PATH=models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
 STT_MODEL_PATH=models/stt/ggml-base.bin
+TTS_MODEL_PATH=models/tts/en_US-lessac-low.onnx
 LOG_LEVEL=INFO
 ```
 
@@ -173,7 +191,7 @@ Or:
 curl http://127.0.0.1:8765/health
 ```
 
-Expected JSON includes `"status": "ok"` once the model file is present. `"model_loaded"` becomes `true` after the first successful load.
+Expected JSON includes `"status": "ok"` and nested `llm` / `stt` / `tts` file state. `"voice_ready"` is true when all three model files are on disk. Each `"model_loaded"` becomes `true` after that engine’s first successful load.
 
 ### 8. Chat (local LLM)
 
@@ -204,6 +222,16 @@ curl -X POST http://127.0.0.1:8765/v1/listen `
   -d "{\"duration_seconds\":5,\"language\":\"auto\"}"
 ```
 
+### 8c. Speak a reply (local Piper)
+
+```powershell
+curl -X POST http://127.0.0.1:8765/v1/speak `
+  -H "Content-Type: application/json" `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string" `
+  -d "{\"text\":\"Opening Visual Studio Code.\",\"language\":\"en\"}" `
+  --output jarvis.wav
+```
+
 ### 9. Tests
 
 ```powershell
@@ -230,20 +258,22 @@ pip install -r requirements.txt
 cp .env.example .env
 python scripts/download_model.py
 python scripts/download_model.py --stt
+python scripts/download_model.py --tts
 python -m uvicorn server.main:app --host 127.0.0.1 --port 8765
 python -m pytest tests -q
 ```
 
 ---
 
-## API (Phase 2)
+## API (Phase 3)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | LLM + STT file/load state |
+| GET | `/health` | no | LLM + STT + TTS file/load state |
 | POST | `/v1/chat` | token | Local chat completion |
 | POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
 | POST | `/v1/listen` | token | Microphone capture → transcript |
+| POST | `/v1/speak` | token | Text → WAV (Piper / espeak-ng) |
 
 `POST /v1/chat` body:
 
@@ -272,7 +302,7 @@ scripts/    Windows setup / start / health
 tests/      Unit + integration tests
 ```
 
-STT, TTS, tools, safety, Mac client, and memory beyond transcription are documented in ARCHITECTURE.md and are not implemented yet.
+STT, TTS, tools, safety, Mac client, and memory beyond speech I/O are documented in ARCHITECTURE.md. Intent/tools start in Phase 4.
 
 ---
 

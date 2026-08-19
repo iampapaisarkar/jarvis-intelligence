@@ -23,6 +23,7 @@ class HealthResponse(BaseModel):
     voice_ready: bool
     llm: LlmHealth
     stt: ModelHealth
+    tts: ModelHealth
 
 
 class ChatMessage(BaseModel):
@@ -78,6 +79,13 @@ class ListenRequest(BaseModel):
     duration_seconds: float = Field(default=5.0, ge=1.0, le=20.0)
     language: Optional[str] = Field(default=None, max_length=16)
     session_id: Optional[str] = Field(default=None, max_length=128)
+
+
+class SpeakRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    language: Optional[str] = Field(default=None, max_length=16)
+    session_id: Optional[str] = Field(default=None, max_length=128)
+    play: bool = False
 
 
 class ErrorBody(BaseModel):

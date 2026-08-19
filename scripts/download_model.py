@@ -12,6 +12,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LLM_DIR = REPO_ROOT / "models" / "llm"
 STT_DIR = REPO_ROOT / "models" / "stt"
+TTS_DIR = REPO_ROOT / "models" / "tts"
 
 MODELS = {
     "1.5b": {
@@ -50,6 +51,25 @@ STT_MODELS = {
         ],
     },
 }
+
+TTS_FILES = [
+    {
+        "filename": "en_US-lessac-low.onnx",
+        "min_bytes": 10_000_000,
+        "urls": [
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/low/en_US-lessac-low.onnx",
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx",
+        ],
+    },
+    {
+        "filename": "en_US-lessac-low.onnx.json",
+        "min_bytes": 500,
+        "urls": [
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/low/en_US-lessac-low.onnx.json",
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx.json",
+        ],
+    },
+]
 
 
 _last_progress = {"pct": -1}
@@ -123,6 +143,11 @@ def main() -> None:
         action="store_true",
         help="With --stt, download ggml-tiny.bin instead of ggml-base.bin",
     )
+    parser.add_argument(
+        "--tts",
+        action="store_true",
+        help="Download the Piper English voice instead of the LLM",
+    )
     parser.add_argument("--force", action="store_true", help="Re-download even if the file exists")
     args = parser.parse_args()
 
@@ -132,6 +157,14 @@ def main() -> None:
         if _already_present(dest, spec["min_bytes"], args.force):
             return
         download(spec["urls"], dest, spec["min_bytes"])
+        return
+
+    if args.tts:
+        for spec in TTS_FILES:
+            dest = TTS_DIR / spec["filename"]
+            if _already_present(dest, spec["min_bytes"], args.force):
+                continue
+            download(spec["urls"], dest, spec["min_bytes"])
         return
 
     spec = MODELS["0.5b"] if args.small else MODELS["1.5b"]

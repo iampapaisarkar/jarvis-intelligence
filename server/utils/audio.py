@@ -21,6 +21,10 @@ class MicrophoneError(AudioError):
     pass
 
 
+class PlaybackError(AudioError):
+    pass
+
+
 def _as_int16_mono(frames: bytes, sample_width: int, channels: int) -> np.ndarray:
     if sample_width == 1:
         data = np.frombuffer(frames, dtype=np.uint8).astype(np.int16)
@@ -136,3 +140,34 @@ def record_microphone(
     del recorded
     del samples
     return duration_seconds
+
+
+def read_wav(path: Path) -> tuple[np.ndarray, int]:
+    """Load a WAV at its native rate. Used for playback, not Whisper."""
+    try:
+        with wave.open(str(path), "rb") as src:
+            channels = src.getnchannels()
+            sample_width = src.getsampwidth()
+            rate = src.getframerate()
+            frames = src.readframes(src.getnframes())
+    except wave.Error as exc:
+        raise AudioError(f"Not a valid WAV file: {path.name}") from exc
+    samples = _as_int16_mono(frames, sample_width, channels)
+    return samples, rate
+
+
+def play_wav(path: Path, *, device: Optional[int] = None) -> None:
+    try:
+        import sounddevice as sd
+    except ImportError as exc:
+        raise PlaybackError(
+            "Playback requires sounddevice. Install: pip install sounddevice"
+        ) from exc
+    samples, rate = read_wav(path)
+    try:
+        sd.play(samples, samplerate=rate, device=device)
+        sd.wait()
+    except Exception as exc:
+        raise PlaybackError(f"Could not play audio: {exc}") from exc
+    finally:
+        del samples

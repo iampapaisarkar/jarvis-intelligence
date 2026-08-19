@@ -171,7 +171,7 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 |-------|--------|--------|
 | **1** | Python FastAPI server, llama.cpp, GGUF load, `/health`, `/v1/chat`, config, logging | **complete** (see issues below) |
 | **2** | Local STT (whisper.cpp), microphone/audio input, `/v1/transcribe`, `/v1/listen` | **complete** (see issues below) |
-| 3 | Local TTS (Piper) | not started |
+| **3** | Local TTS (Piper), `/v1/speak`, optional speaker playback | **complete** (see issues below) |
 | 4 | Intent parser, tool registry, structured tool calls | not started |
 | 5 | Safety engine, risk levels, confirmation, command policy | not started |
 | 6 | Windows tools (apps, filesystem, safe terminal) | not started |
@@ -226,6 +226,27 @@ STT is lazy-loaded in its own single worker thread. It must not start a second L
 3. **Bangla was not integration-tested.** The model is multilingual `ggml-base`; English “open visual studio code” was verified. Bangla/Banglish accuracy on tiny/base will be weaker than small.
 4. **Still not proven on the Windows i3.** `STT_USE_GPU=false` is the default so CPU-only machines match the architecture.
 5. **`pywhispercpp` depends on `requests`.** That package can download models if you pass a name like `base`. Jarvis only loads a local GGML path and never calls a cloud STT API.
+
+## Phase 3 detail
+
+Phase 3 proves the brain can speak offline:
+
+1. Abstract `TextToSpeech.speak(text, language) -> SynthesizedSpeech`.
+2. Piper ONNX for English (`en_US-lessac-low`, CPU, no CUDA).
+3. Official Piper has no Bangla voice. Bengali script uses local **espeak-ng** (`-v bn`) when installed, or an optional `TTS_BN_MODEL_PATH` Piper voice. If neither exists, English Piper is used and `fallback=true`.
+4. `POST /v1/speak` returns a WAV. `play: true` also plays on the server’s default output.
+5. `voice_ready` is true only when LLM, STT, and TTS model files are all present.
+
+## Phase 3 issues (open)
+
+Verified on macOS arm64 / Python 3.12: English `POST /v1/speak` returned a Piper WAV (`en_US-lessac-low`, ~723 ms, ~2.1 s audio). Whisper round-trip transcribed it as `"Opening Visual Studio Code"`. Bangla used local espeak-ng (`-v bn`, ~61 ms). 44 tests passed. `voice_ready` is true when all three model files are on disk.
+
+1. **No official Piper Bangla voice.** Neural Bangla TTS is not in this milestone unless you add a community `.onnx` via `TTS_BN_MODEL_PATH`.
+2. **espeak-ng is required for decent Bangla.** Windows must install it separately (`choco install espeak`); otherwise Bangla falls back to English Piper with `X-Jarvis-Fallback: true`.
+3. **Playback is best-effort.** `play: true` uses `sounddevice`; synthesis still succeeds if speakers are missing. Live speaker playback was not tested here (default `play: false`).
+4. **Not proven on the Windows i3.** First speak loads the ONNX; keep `TTS_PRELOAD=false` unless you want that cost at startup.
+5. **Do not load Piper, Whisper, and the LLM at once on 8 GB if the machine swaps.** All three are lazy-loaded independently.
+6. **WAV out only.** `/v1/speak` returns PCM WAV. The Mac client (Phase 7) can play that locally.
 
 
 ## Runtime layout (target)

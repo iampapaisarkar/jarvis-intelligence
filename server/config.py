@@ -44,7 +44,11 @@ class Settings(BaseSettings):
     stt_max_audio_seconds: float = 20.0
     stt_max_upload_bytes: int = 8 * 1024 * 1024
     mic_sample_rate: int = 16000
-    tts_model_path: Path = Path("models/tts")
+    tts_model_path: Path = Path("models/tts/en_US-lessac-low.onnx")
+    tts_bn_model_path: Optional[Path] = None
+    tts_preload: bool = False
+    tts_use_cuda: bool = False
+    tts_max_chars: int = 500
 
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
@@ -79,6 +83,13 @@ class Settings(BaseSettings):
             raise ValueError("STT_MAX_AUDIO_SECONDS must be between 1 and 60")
         return value
 
+    @field_validator("tts_max_chars")
+    @classmethod
+    def _tts_chars(cls, value: int) -> int:
+        if value < 1 or value > 2000:
+            raise ValueError("TTS_MAX_CHARS must be between 1 and 2000")
+        return value
+
     def resolve_path(self, path: Path) -> Path:
         if path.is_absolute():
             return path
@@ -106,6 +117,28 @@ class Settings(BaseSettings):
                     return candidate
             matches = sorted(
                 p for p in path.glob("ggml-*.bin") if p.is_file() and p.stat().st_size > 0
+            )
+            if matches:
+                return matches[0]
+        return path
+
+    @property
+    def tts_model_file(self) -> Path:
+        path = self.resolve_path(self.tts_model_path)
+        if path.is_file():
+            return path
+        if path.is_dir():
+            preferred = (
+                "en_US-lessac-low.onnx",
+                "en_US-lessac-medium.onnx",
+                "en_US-amy-low.onnx",
+            )
+            for name in preferred:
+                candidate = path / name
+                if candidate.is_file() and candidate.stat().st_size > 0:
+                    return candidate
+            matches = sorted(
+                p for p in path.glob("*.onnx") if p.is_file() and p.stat().st_size > 0
             )
             if matches:
                 return matches[0]
