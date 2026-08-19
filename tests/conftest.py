@@ -216,6 +216,15 @@ def isolated_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVIS_TOOLS_BACKEND", "posix")
     monkeypatch.setenv("JARVIS_WORKSPACE", str(workspace))
     monkeypatch.setenv("JARVIS_MEMORY_PATH", str(tmp_path / "memory.sqlite"))
+    for owner_key in (
+        "JARVIS_OWNER_NAME",
+        "JARVIS_OWNER_EMAIL",
+        "JARVIS_OWNER_PHONE",
+        "JARVIS_OWNER_ADDRESS",
+        "JARVIS_SPOUSE_NAME",
+        "JARVIS_CHILD_NAME",
+    ):
+        monkeypatch.setenv(owner_key, " ")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
     clear_settings_cache()
     reset_singletons()

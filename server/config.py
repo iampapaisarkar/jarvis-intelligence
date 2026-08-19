@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     stt_max_audio_seconds: float = 20.0
     stt_max_upload_bytes: int = 8 * 1024 * 1024
     mic_sample_rate: int = 16000
-    tts_model_path: Path = Path("models/tts/en_US-lessac-low.onnx")
+    tts_model_path: Path = Path("models/tts/en_US-ryan-medium.onnx")
     tts_bn_model_path: Optional[Path] = None
     tts_preload: bool = False
     tts_use_cuda: bool = False
@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     jarvis_wake_word: str = "jarvis"
     jarvis_discovery_enabled: bool = True
     jarvis_discovery_port: int = 8766
+    jarvis_owner_name: str = ""
+    jarvis_owner_email: str = ""
+    jarvis_owner_phone: str = ""
+    jarvis_owner_address: str = ""
+    jarvis_spouse_name: str = ""
+    jarvis_child_name: str = ""
 
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
@@ -221,9 +227,11 @@ class Settings(BaseSettings):
             return path
         if path.is_dir():
             preferred = (
-                "en_US-lessac-low.onnx",
+                "en_US-ryan-medium.onnx",
+                "en_US-ryan-low.onnx",
+                "en_US-joe-medium.onnx",
                 "en_US-lessac-medium.onnx",
-                "en_US-amy-low.onnx",
+                "en_US-lessac-low.onnx",
             )
             for name in preferred:
                 candidate = path / name

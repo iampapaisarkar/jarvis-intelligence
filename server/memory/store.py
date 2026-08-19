@@ -14,6 +14,7 @@ from server.memory.keys import (
     ALIAS_KINDS,
     DEFAULT_PATH_ALIASES,
     DEFAULT_PROJECTS_DIRECTORY,
+    PREFERENCE_LABELS,
 )
 from server.utils.logger import get_logger
 
@@ -267,11 +268,11 @@ class MemoryStore:
         except ValueError as exc:
             return False, str(exc), "invalid_preference", {}
         key = saved["key"]
-        spoken = (
-            f"I'll remember that your projects are in {saved['value']}."
-            if key == "default_projects_directory"
-            else f"I'll remember {key}."
-        )
+        if key == "default_projects_directory":
+            spoken = f"I'll remember that your projects are in {saved['value']}."
+        else:
+            label = PREFERENCE_LABELS.get(key, key.replace("_", " "))
+            spoken = f"I'll remember {label}."
         return True, spoken, "remembered", saved
 
     def prompt_context(self) -> str:
@@ -285,10 +286,26 @@ class MemoryStore:
         for item in aliases:
             lines.append(f"- {item['kind']} alias {item['name']} = {item['value']}")
         lines.append(
-            "If the user states a lasting preference, use remember_preference. "
-            "A folder name with no path uses default_projects_directory as the parent."
+            "If the user states a lasting personal fact or preference, use remember_preference. "
+            "Allowed keys include owner_name, owner_email, owner_phone, owner_address, "
+            "spouse_name, child_name, preferred_language, address_as, default_projects_directory. "
+            "Never store passwords or API keys. "
+            "A folder name with no path uses default_projects_directory as the parent. "
+            "Opening a named project uses open_path with that folder, optionally in Visual Studio Code."
         )
         return "\n".join(lines)
+
+    def seed_from_values(self, values: dict[str, str]) -> None:
+        for key, raw in values.items():
+            if key not in ALLOWED_PREFERENCE_KEYS:
+                continue
+            value = (raw or "").strip()
+            if not value or self.get_preference(key) is not None:
+                continue
+            try:
+                self.set_preference(key, value)
+            except ValueError:
+                continue
 
     def _init_schema(self) -> None:
         with self._lock:

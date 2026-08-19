@@ -29,6 +29,10 @@ def enrich_intent(intent: ParsedIntent, memory: MemoryStore) -> ParsedIntent:
     spoken = intent.spoken_reply
     if intent.tool == "open_application":
         spoken = f"Opening {arguments.get('application', 'the application')}."
+    elif intent.tool == "open_path":
+        app = arguments.get("application")
+        path = arguments.get("path", "that folder")
+        spoken = f"Opening {path} in {app}." if app else f"Opening {path}."
     elif intent.tool in PATH_TOOLS and "path" in arguments:
         spoken = intent.spoken_reply.replace(str(intent.arguments.get("path") or ""), str(arguments["path"]), 1)
     return replace(intent, arguments=arguments, message=spoken, spoken_reply=spoken)
@@ -41,6 +45,10 @@ def enrich_arguments(tool: str, arguments: dict[str, Any], memory: MemoryStore) 
         resolved = memory.resolve_application(raw) or resolve_application_alias(raw)
         if resolved:
             updated["application"] = resolved
+    if tool == "open_path":
+        raw_app = updated.get("application")
+        if isinstance(raw_app, str) and raw_app.strip():
+            updated["application"] = memory.resolve_application(raw_app) or resolve_application_alias(raw_app)
     if tool in PATH_TOOLS and "path" in updated:
         updated["path"] = memory.resolve_path(
             str(updated["path"]),

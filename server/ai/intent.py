@@ -304,6 +304,10 @@ class IntentParser:
 def _default_spoken(spec: ToolSpec, arguments: dict[str, Any], target: str) -> str:
     if spec.name == "open_application":
         return f"Opening {arguments.get('application', 'the application')}."
+    if spec.name == "open_path":
+        app = arguments.get("application")
+        path = arguments.get("path", "that folder")
+        return f"Opening {path} in {app}." if app else f"Opening {path}."
     if spec.name == "list_directory":
         return f"Listing {arguments.get('path', 'that folder')}."
     if spec.name == "create_folder":

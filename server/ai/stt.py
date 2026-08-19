@@ -59,6 +59,39 @@ class Transcript:
     model_path: str = ""
 
 
+def contains_bengali(text: str) -> bool:
+    return any("\u0980" <= ch <= "\u09FF" for ch in (text or ""))
+
+
+_OTHER_SCRIPTS = (
+    (0x0B80, 0x0BFF),  # Tamil
+    (0x0C00, 0x0C7F),  # Telugu
+    (0x0C80, 0x0CFF),  # Kannada
+    (0x0D00, 0x0D7F),  # Malayalam
+    (0x0A00, 0x0A7F),  # Gurmukhi
+    (0x0600, 0x06FF),  # Arabic
+    (0x0E00, 0x0E7F),  # Thai
+    (0x3040, 0x30FF),  # Japanese kana
+    (0x4E00, 0x9FFF),  # CJK
+    (0xAC00, 0xD7AF),  # Hangul
+)
+_TURKISH = set("ğüşöçıİĞÜŞÖÇ")
+
+
+def looks_wrong_language(text: str) -> bool:
+    """True when Whisper likely picked Tamil/Turkish/etc. instead of English or Bangla."""
+    if not text or contains_bengali(text):
+        return False
+    if any(ch in _TURKISH for ch in text):
+        return True
+    for ch in text:
+        code = ord(ch)
+        for start, end in _OTHER_SCRIPTS:
+            if start <= code <= end:
+                return True
+    return False
+
+
 class SpeechToText(Protocol):
     """Abstract local STT. The rest of Jarvis must not import whisper.cpp types."""
 
@@ -227,26 +260,48 @@ class WhisperCppSTT:
             lang or "auto",
             extra=extra,
         )
+        result = self._whisper_once(audio_path, lang, extra)
+        if lang is None and looks_wrong_language(result.text):
+            bn = self._whisper_once(audio_path, "bn", extra)
+            if contains_bengali(bn.text) or not looks_wrong_language(bn.text):
+                result = bn
+            else:
+                en = self._whisper_once(audio_path, "en", extra)
+                if en.text and not looks_wrong_language(en.text):
+                    result = en
+        logger.info(
+            "STT complete chars=%s latency_ms=%s confidence=%s",
+            len(result.text),
+            result.latency_ms,
+            result.confidence,
+            extra=extra,
+        )
+        return result
+
+    def _whisper_once(
+        self,
+        audio_path: Path,
+        lang: Optional[str],
+        extra: dict[str, Any],
+    ) -> Transcript:
+        assert self._model is not None
         params: dict[str, Any] = {
             "print_progress": False,
             "print_realtime": False,
             "single_segment": True,
             "no_context": True,
+            "language": lang or "auto",
         }
-        if lang:
-            params["language"] = lang
-        else:
-            params["language"] = "auto"
-
         started = time.perf_counter()
         try:
-            segments = self._model.transcribe(
-                str(audio_path),
-                extract_probability=True,
-                **params,
-            )
-        except TypeError:
-            segments = self._model.transcribe(str(audio_path), **params)
+            try:
+                segments = self._model.transcribe(
+                    str(audio_path),
+                    extract_probability=True,
+                    **params,
+                )
+            except TypeError:
+                segments = self._model.transcribe(str(audio_path), **params)
         except Exception as exc:
             raise STTError(f"Whisper transcription failed: {exc}") from exc
         latency_ms = (time.perf_counter() - started) * 1000
@@ -270,7 +325,7 @@ class WhisperCppSTT:
         confidences = [part.confidence for part in parsed if part.confidence is not None]
         confidence = sum(confidences) / len(confidences) if confidences else None
         duration_ms = parsed[-1].end_ms if parsed else 0.0
-        result = Transcript(
+        return Transcript(
             text=text,
             language=lang,
             confidence=None if confidence is None else round(confidence, 4),
@@ -279,14 +334,6 @@ class WhisperCppSTT:
             latency_ms=round(latency_ms, 1),
             model_path=self.model_path,
         )
-        logger.info(
-            "STT complete chars=%s latency_ms=%s confidence=%s",
-            len(result.text),
-            result.latency_ms,
-            result.confidence,
-            extra=extra,
-        )
-        return result
 
     async def transcribe(
         self,

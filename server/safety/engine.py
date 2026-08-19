@@ -225,6 +225,11 @@ class SafetyEngine:
             if application_is_forbidden(app):
                 return "blocked_executable"
 
+        if spec.name == "open_path":
+            app = str(arguments.get("application") or "")
+            if app and application_is_forbidden(app):
+                return "blocked_executable"
+
         if spec.name == "remember_preference":
             key = str(arguments.get("key") or "")
             value = str(arguments.get("value") or "")
@@ -288,6 +293,12 @@ def _confirm_prompt(spec: ToolSpec, target: str, arguments: dict[str, Any]) -> s
 def _allowed_spoken(spec: ToolSpec, target: str, arguments: dict[str, Any]) -> str:
     if spec.name == "open_application":
         return f"Opening {arguments.get('application', 'the application')}."
+    if spec.name == "open_path":
+        app = arguments.get("application")
+        path = arguments.get("path", "that folder")
+        if app:
+            return f"Opening {path} in {app}."
+        return f"Opening {path}."
     if spec.name == "list_directory":
         return f"Listing {arguments.get('path', 'that folder')}."
     if spec.name == "get_system_info":

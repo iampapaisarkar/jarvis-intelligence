@@ -12,6 +12,7 @@ from server.config import Settings, get_settings
 from server.safety.confirm import ConfirmationStore
 from server.safety.engine import SafetyEngine
 from server.mac.bridge import MacBridge
+from server.memory.keys import OWNER_SETTING_MAP
 from server.memory.store import MemoryStore
 from server.tools.catalog import default_registry
 from server.tools.executor import LocalToolExecutor
@@ -54,7 +55,11 @@ def get_mac_bridge() -> MacBridge:
 @lru_cache
 def get_memory_store() -> MemoryStore:
     settings = get_settings()
-    return MemoryStore(settings.memory_file, history_limit=settings.jarvis_memory_history_limit)
+    store = MemoryStore(settings.memory_file, history_limit=settings.jarvis_memory_history_limit)
+    store.seed_from_values(
+        {memory_key: str(getattr(settings, setting, "") or "") for setting, memory_key in OWNER_SETTING_MAP}
+    )
+    return store
 
 
 def get_tool_executor(settings: Settings = Depends(get_settings)) -> LocalToolExecutor:

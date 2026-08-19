@@ -127,13 +127,19 @@ If RAM is tight, use tiny (~75 MB, weaker Bangla):
 python scripts\download_model.py --stt --tiny
 ```
 
-Then set `STT_MODEL_PATH=models/stt/ggml-tiny.bin` in `.env`.
+If RAM allows, `ggml-small.bin` hears Indian Bangla more reliably:
+
+```powershell
+python scripts\download_model.py --stt --stt-small
+```
+
+Then set `STT_MODEL_PATH=models/stt/ggml-small.bin` in `.env`.
 
 On Windows, `pywhispercpp` may need the same C++ Build Tools as llama-cpp-python. Microphone capture needs a working input device; WAV upload works without a mic.
 
 ### 4c. Download the Piper TTS voice (needs internet once)
 
-Default: **en_US-lessac-low** (~63 MB ONNX, CPU).
+Default: **en_US-ryan-medium** (male US English, more natural than the old low female voice).
 
 ```powershell
 python scripts\download_model.py --tts
@@ -142,11 +148,11 @@ python scripts\download_model.py --tts
 This writes:
 
 ```
-models\tts\en_US-lessac-low.onnx
-models\tts\en_US-lessac-low.onnx.json
+models\tts\en_US-ryan-medium.onnx
+models\tts\en_US-ryan-medium.onnx.json
 ```
 
-Piper has no official Bangla voice. For Bengali speech, install [espeak-ng](https://github.com/espeak-ng/espeak-ng) (`choco install espeak`) or set `TTS_BN_MODEL_PATH` to a local Bangla Piper ONNX.
+Piper has no official Bangla voice. For Bengali speech, install [espeak-ng](https://github.com/espeak-ng/espeak-ng) (`choco install espeak`) or set `TTS_BN_MODEL_PATH` to a local Bangla Piper ONNX. espeak-ng still sounds synthetic; English replies use Ryan.
 
 ### 5. Configure
 
@@ -158,9 +164,18 @@ JARVIS_PORT=8765
 JARVIS_AUTH_TOKEN=change-me-to-a-long-random-string
 LLM_MODEL_PATH=models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
 STT_MODEL_PATH=models/stt/ggml-base.bin
-TTS_MODEL_PATH=models/tts/en_US-lessac-low.onnx
+TTS_MODEL_PATH=models/tts/en_US-ryan-medium.onnx
 LOG_LEVEL=INFO
 ```
+
+Optional identity (stored in local SQLite, never committed):
+
+```
+JARVIS_OWNER_NAME=Your Name
+JARVIS_OWNER_EMAIL=you@example.com
+```
+
+Say “remember this” / “keep this in mind” and Jarvis stores allowlisted facts (name, email, phone, address, family). Passwords and API keys are refused.
 
 Bind to the LAN if the Mac client will connect later. **Do not port-forward this port on your router.**
 

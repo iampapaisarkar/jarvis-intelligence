@@ -8,10 +8,7 @@ from dataclasses import dataclass
 DEFAULT_WAKE_WORD = "jarvis"
 DEFAULT_ALIASES = ("jarvis", "jarvish", "জার্ভিস")
 _PREFIXES = ("hey", "hi", "ok", "okay", "oi")
-_JUNK_TAGS = re.compile(
-    r"^\[(?:blank(?:[_\s-]?audio)?|silence|music|noise|inaudible|cough)\]$",
-    re.IGNORECASE,
-)
+_JUNK_TAGS = re.compile(r"^\[.+\]$", re.IGNORECASE)
 _JUNK_PHRASES = {
     "blank",
     "blank audio",

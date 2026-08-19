@@ -7,6 +7,7 @@ from server.config import REPO_ROOT, Settings
 from server.utils.audio import wav_duration_seconds
 
 CANDIDATES = [
+    REPO_ROOT / "models" / "tts" / "en_US-ryan-medium.onnx",
     REPO_ROOT / "models" / "tts" / "en_US-lessac-low.onnx",
     REPO_ROOT / "models" / "tts" / "en_US-lessac-medium.onnx",
 ]

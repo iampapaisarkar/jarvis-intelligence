@@ -14,6 +14,24 @@ def test_extract_ignores_unrelated_text():
     assert extract_remember_preference("Open VS Code") is None
 
 
+def test_extract_personal_facts():
+    from server.memory.phrases import extract_personal_query, extract_remember_preferences, recall_spoken
+
+    items = extract_remember_preferences(
+        "My name is Papai Sarkar. My email is iampapaisarkar@gmail.com. "
+        "My phone number is 9002094533. My wife's name is Megha. My son's name is Pritth. "
+        "Please store these details."
+    )
+    by_key = {item["key"]: item["value"] for item in items}
+    assert by_key["owner_name"] == "Papai Sarkar"
+    assert by_key["owner_email"] == "iampapaisarkar@gmail.com"
+    assert by_key["owner_phone"] == "9002094533"
+    assert by_key["spouse_name"] == "Megha"
+    assert by_key["child_name"] == "Pritth"
+    assert extract_personal_query("What is my email?") == "owner_email"
+    assert "iampapaisarkar@gmail.com" in recall_spoken("owner_email", "iampapaisarkar@gmail.com")
+
+
 def test_seed_preferences_and_path_aliases(tmp_path):
     store = MemoryStore(tmp_path / "mem.sqlite", history_limit=20)
     try:

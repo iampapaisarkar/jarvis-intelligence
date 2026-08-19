@@ -5,6 +5,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from server.ai.compound import parse_compound_opens
 from server.ai.intent import IntentParser, ParsedIntent
 from server.api.schemas import (
     ConfirmRequest,
@@ -26,7 +27,8 @@ from server.dependencies import (
     get_tool_registry,
 )
 from server.mac.bridge import MacBridge
-from server.memory.phrases import extract_remember_preference
+from server.memory.keys import PREFERENCE_LABELS
+from server.memory.phrases import extract_personal_query, extract_remember_preferences, recall_spoken
 from server.memory.resolve import enrich_intent
 from server.memory.store import MemoryStore
 from server.safety.confirm import ConfirmationStore
@@ -211,27 +213,123 @@ async def parse_intent(
     if handled is not None:
         return handled
 
-    remembered = extract_remember_preference(body.text)
-    if remembered is not None:
+    remembered_list = extract_remember_preferences(body.text)
+    query_key = extract_personal_query(body.text)
+    if query_key is not None and not remembered_list:
+        spoken = recall_spoken(query_key, memory.get_preference(query_key))
+        return _response(
+            GatedIntent(
+                type="reply",
+                safety="not_applicable",
+                message=spoken,
+                spoken_reply=spoken,
+                session_id=session_id,
+                reason="memory_recall",
+            )
+        )
+
+    if remembered_list:
+        last: GatedIntent | None = None
+        labels: list[str] = []
         spec = registry.require("remember_preference")
-        parsed_intent = ParsedIntent(
-            type="tool_call",
-            message=f"I'll remember {remembered['key']}.",
-            spoken_reply=f"I'll remember {remembered['key']}.",
-            session_id=session_id,
-            tool=spec.name,
-            target=body.target or settings.jarvis_default_target,  # type: ignore[arg-type]
-            arguments=remembered,
-            risk=spec.risk,
-            requires_confirmation=spec.requires_confirmation,
+        for remembered in remembered_list:
+            parsed_intent = ParsedIntent(
+                type="tool_call",
+                message=f"I'll remember {remembered['key']}.",
+                spoken_reply=f"I'll remember {remembered['key']}.",
+                session_id=session_id,
+                tool=spec.name,
+                target=body.target or settings.jarvis_default_target,  # type: ignore[arg-type]
+                arguments=remembered,
+                risk=spec.risk,
+                requires_confirmation=spec.requires_confirmation,
+            )
+            last = await apply_execution(
+                engine.gate(enrich_intent(parsed_intent, memory)),
+                registry=registry,
+                executor=executor,
+                bridge=bridge,
+                memory=memory,
+            )
+            labels.append(PREFERENCE_LABELS.get(remembered["key"], remembered["key"]))
+        assert last is not None
+        if len(labels) == 1:
+            spoken = last.spoken_reply
+        else:
+            spoken = "I'll remember " + _join_en(labels) + "."
+        return _response(
+            GatedIntent(
+                type=last.type,
+                safety=last.safety,
+                message=spoken,
+                spoken_reply=spoken,
+                session_id=last.session_id,
+                executed=last.executed,
+                confirmed=last.confirmed,
+                confirmation_id=last.confirmation_id,
+                tool=last.tool,
+                target=last.target,
+                arguments=last.arguments,
+                risk=last.risk,
+                requires_confirmation=last.requires_confirmation,
+                reason=last.reason,
+                result={"saved": [item["key"] for item in remembered_list]},
+            )
         )
-    else:
-        parsed_intent = await parser.parse(
-            body.text,
-            session_id=session_id,
-            default_target=body.target,
-            memory_context=memory.prompt_context(),
+
+    plan = parse_compound_opens(
+        body.text,
+        target=body.target or settings.jarvis_default_target,
+        session_id=session_id,
+    )
+    if plan:
+        spoken_bits: list[str] = []
+        last_step: GatedIntent | None = None
+        step_results: list[dict] = []
+        executed_all = True
+        for step in plan:
+            gated = await apply_execution(
+                engine.gate(enrich_intent(step, memory)),
+                registry=registry,
+                executor=executor,
+                bridge=bridge,
+                memory=memory,
+            )
+            last_step = gated
+            spoken_bits.append(gated.spoken_reply)
+            if gated.result:
+                step_results.append(gated.result)
+            executed_all = executed_all and gated.executed
+            if gated.safety == "denied":
+                return _response(gated)
+        assert last_step is not None
+        spoken = " ".join(part for part in spoken_bits if part)
+        return _response(
+            GatedIntent(
+                type=last_step.type,
+                safety=last_step.safety,
+                message=spoken,
+                spoken_reply=spoken,
+                session_id=session_id,
+                executed=executed_all,
+                confirmed=last_step.confirmed,
+                confirmation_id=last_step.confirmation_id,
+                tool=last_step.tool,
+                target=last_step.target,
+                arguments=last_step.arguments,
+                risk=last_step.risk,
+                requires_confirmation=last_step.requires_confirmation,
+                reason=last_step.reason,
+                result={"steps": step_results} if step_results else last_step.result,
+            )
         )
+
+    parsed_intent = await parser.parse(
+        body.text,
+        session_id=session_id,
+        default_target=body.target,
+        memory_context=memory.prompt_context(),
+    )
     parsed_intent = enrich_intent(parsed_intent, memory)
     return _response(
         await apply_execution(
@@ -282,3 +380,13 @@ async def _handle_spoken_confirmation(
             extra={"session_id": session_id},
         )
     return None
+
+
+def _join_en(parts: list[str]) -> str:
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0]
+    if len(parts) == 2:
+        return f"{parts[0]} and {parts[1]}"
+    return ", ".join(parts[:-1]) + f", and {parts[-1]}"

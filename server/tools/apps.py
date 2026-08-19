@@ -33,6 +33,10 @@ _WINDOWS_HINTS: dict[str, tuple[str, ...]] = {
         r"%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe",
     ),
     "spotify": (r"%APPDATA%\Spotify\Spotify.exe",),
+    "slack": (
+        r"%LOCALAPPDATA%\slack\slack.exe",
+        r"%LOCALAPPDATA%\Slack\Slack.exe",
+    ),
 }
 
 
@@ -56,14 +60,25 @@ def windows_executable(application: str) -> Optional[Path]:
     return None
 
 
-def app_argv(application: str, *, backend: str) -> list[str]:
+def app_argv(application: str, *, backend: str, extra: Optional[list[str]] = None) -> list[str]:
     canonical = resolve_application_alias(application)
+    suffix = list(extra or [])
     if backend == "windows":
         exe = windows_executable(canonical)
         if exe is None:
             raise ToolExecutionError(f"I couldn't find {canonical} on this computer.")
-        return [str(exe)]
+        return [str(exe), *suffix]
+    if suffix:
+        return ["open", "-a", canonical, *suffix]
     return ["open", "-a", canonical]
+
+
+def path_argv(path: str, *, application: Optional[str], backend: str) -> list[str]:
+    if application:
+        return app_argv(application, backend=backend, extra=[path])
+    if backend == "windows":
+        return [path]
+    return ["open", path]
 
 
 def launch_app(argv: list[str], launch: Optional[LaunchFn] = None) -> None:

@@ -13,7 +13,7 @@ from server.config import Settings
 from server.memory.keys import BRAIN_LOCAL_TOOLS
 from server.safety.engine import GatedIntent
 from server.safety.policy import command_is_forbidden
-from server.tools.apps import LaunchFn, app_argv, launch_app
+from server.tools.apps import LaunchFn, app_argv, launch_app, path_argv
 from server.tools.base import Target, ToolSpec
 from server.tools.paths import ToolExecutionError, resolve_user_path, user_home, workspace_root
 from server.tools.registry import ToolRegistry
@@ -98,6 +98,8 @@ class LocalToolExecutor:
     ) -> tuple[dict[str, Any], str]:
         if spec.name == "open_application":
             return self._open_application(arguments)
+        if spec.name == "open_path":
+            return self._open_path(target, arguments)
         if spec.name == "list_directory":
             return self._list_directory(target, arguments)
         if spec.name == "get_system_info":
@@ -117,6 +119,30 @@ class LocalToolExecutor:
         argv = app_argv(application, backend=self.backend)
         launch_app(argv, launch=self._launch)
         return {"application": application, "argv": argv}, f"Opening {application}."
+
+    def _open_path(self, target: Target, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        path = resolve_user_path(
+            str(arguments["path"]),
+            self._settings,
+            target=target,
+            must_exist=True,
+            destructive=False,
+        )
+        application = arguments.get("application")
+        app_name = str(application).strip() if application else ""
+        if app_name:
+            argv = path_argv(str(path), application=app_name, backend=self.backend)
+            launch_app(argv, launch=self._launch)
+            spoken = f"Opening {path.name} in {app_name}."
+        elif self.backend == "windows" and self._launch is None:
+            os.startfile(str(path))  # type: ignore[attr-defined]
+            argv = [str(path)]
+            spoken = f"Opening {path.name}."
+        else:
+            argv = path_argv(str(path), application=None, backend=self.backend)
+            launch_app(argv, launch=self._launch)
+            spoken = f"Opening {path.name}."
+        return {"path": str(path), "application": app_name or None, "argv": argv}, spoken
 
     def _list_directory(self, target: Target, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
         folder = resolve_user_path(

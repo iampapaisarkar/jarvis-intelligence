@@ -6,6 +6,7 @@ def test_default_registry_names_are_stable():
     registry = default_registry()
     assert registry.names() == [
         "open_application",
+        "open_path",
         "list_directory",
         "get_system_info",
         "create_folder",
@@ -14,7 +15,7 @@ def test_default_registry_names_are_stable():
         "run_terminal",
         "remember_preference",
     ]
-    assert len(registry) == 8
+    assert len(registry) == 9
 
 
 def test_unknown_tool_is_rejected():
@@ -31,6 +32,14 @@ def test_open_application_aliases_vscode():
     args = spec.validate_args({"application": "vscode"})
     assert args["application"] == "Visual Studio Code"
     assert resolve_application_alias("VS Code") == "Visual Studio Code"
+    assert resolve_application_alias("slack") == "Slack"
+
+
+def test_open_path_optional_editor():
+    spec = default_registry().require("open_path")
+    args = spec.validate_args({"path": "gurbly", "application": "vs code"})
+    assert args["path"] == "gurbly"
+    assert args["application"] == "Visual Studio Code"
 
 
 def test_open_application_rejects_empty_name():

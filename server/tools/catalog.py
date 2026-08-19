@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 from server.memory.keys import ALLOWED_PREFERENCE_KEYS
@@ -31,12 +33,28 @@ APPLICATION_ALIASES = {
     "notes": "Notes",
     "calculator": "Calculator",
     "spotify": "Spotify",
+    "slack": "Slack",
+    "zoom": "zoom.us",
+    "discord": "Discord",
+    "whatsapp": "WhatsApp",
+    "notion": "Notion",
+    "cursor": "Cursor",
+    "mail": "Mail",
 }
 
 
 def resolve_application_alias(name: str) -> str:
     key = " ".join(name.strip().lower().replace("_", " ").replace("-", " ").split())
     return APPLICATION_ALIASES.get(key, name.strip())
+
+
+def is_known_application(name: str) -> bool:
+    key = " ".join((name or "").strip().lower().replace("_", " ").replace("-", " ").split())
+    if not key:
+        return False
+    if key in APPLICATION_ALIASES:
+        return True
+    return key in {value.lower() for value in APPLICATION_ALIASES.values()}
 
 
 class OpenApplicationArgs(BaseModel):
@@ -69,6 +87,17 @@ class CreateFileArgs(PathArgs):
 
 class EmptyArgs(BaseModel):
     pass
+
+
+class OpenPathArgs(PathArgs):
+    application: Optional[str] = Field(default=None, max_length=128)
+
+    @field_validator("application")
+    @classmethod
+    def _open_with(cls, value: Optional[str]) -> Optional[str]:
+        if value is None or not str(value).strip():
+            return None
+        return resolve_application_alias(value)
 
 
 class RememberPreferenceArgs(BaseModel):
@@ -111,6 +140,15 @@ OPEN_APPLICATION = ToolSpec(
     risk="low",
     requires_confirmation=False,
     args_model=OpenApplicationArgs,
+)
+
+OPEN_PATH = ToolSpec(
+    name="open_path",
+    description="Open a file or project folder. Optional application (e.g. Visual Studio Code) opens it in that app.",
+    allowed_targets=("windows", "mac"),
+    risk="low",
+    requires_confirmation=False,
+    args_model=OpenPathArgs,
 )
 
 LIST_DIRECTORY = ToolSpec(
@@ -169,7 +207,11 @@ RUN_TERMINAL = ToolSpec(
 
 REMEMBER_PREFERENCE = ToolSpec(
     name="remember_preference",
-    description="Store a lasting preference. Allowed keys: default_projects_directory, preferred_language, address_as.",
+    description=(
+        "Store a lasting personal fact or preference. Allowed keys: "
+        "owner_name, owner_email, owner_phone, owner_address, spouse_name, child_name, "
+        "preferred_language, address_as, default_projects_directory."
+    ),
     allowed_targets=("windows", "mac"),
     risk="low",
     requires_confirmation=False,
@@ -178,6 +220,7 @@ REMEMBER_PREFERENCE = ToolSpec(
 
 DEFAULT_TOOLS = (
     OPEN_APPLICATION,
+    OPEN_PATH,
     LIST_DIRECTORY,
     GET_SYSTEM_INFO,
     CREATE_FOLDER,

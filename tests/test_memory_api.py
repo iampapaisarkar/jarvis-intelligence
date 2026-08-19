@@ -58,6 +58,26 @@ def test_remember_phrase_skips_llm(client, fake_llm):
     assert values["default_projects_directory"] == "~/Code"
 
 
+def test_remember_and_recall_personal_name(client, fake_llm):
+    fake_llm.reply = "unused"
+    stored = client.post(
+        "/v1/intent",
+        headers=_headers(),
+        json={"text": "My name is Papai Sarkar. Please remember that.", "session_id": "who-1"},
+    )
+    assert stored.json()["executed"] is True
+    assert fake_llm.call_count == 0
+    asked = client.post(
+        "/v1/intent",
+        headers=_headers(),
+        json={"text": "What is my name?", "session_id": "who-2"},
+    )
+    body = asked.json()
+    assert body["type"] == "reply"
+    assert "Papai Sarkar" in body["spoken_reply"]
+    assert fake_llm.call_count == 0
+
+
 def test_create_folder_bare_name_uses_projects_dir(client, fake_llm):
     fake_llm.reply = json.dumps(
         {

@@ -36,6 +36,7 @@ def test_blank_audio_is_not_a_command():
     from server.ai.wake import is_junk_transcript
 
     assert is_junk_transcript("[BLANK_AUDIO]") is True
+    assert is_junk_transcript("[Motor]") is True
     assert is_junk_transcript("Thank you.") is True
     assert is_junk_transcript("open safari") is False
     match = match_wake_word("[BLANK_AUDIO]")

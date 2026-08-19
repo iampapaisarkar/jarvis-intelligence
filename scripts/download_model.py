@@ -43,6 +43,13 @@ STT_MODELS = {
             "https://github.com/ggerganov/whisper.cpp/raw/master/models/ggml-base.bin",
         ],
     },
+    "small": {
+        "filename": "ggml-small.bin",
+        "min_bytes": 40_000_000,
+        "urls": [
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+        ],
+    },
     "tiny": {
         "filename": "ggml-tiny.bin",
         "min_bytes": 10_000_000,
@@ -54,19 +61,19 @@ STT_MODELS = {
 
 TTS_FILES = [
     {
-        "filename": "en_US-lessac-low.onnx",
+        "filename": "en_US-ryan-medium.onnx",
         "min_bytes": 10_000_000,
         "urls": [
-            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/low/en_US-lessac-low.onnx",
-            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx",
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/medium/en_US-ryan-medium.onnx",
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx",
         ],
     },
     {
-        "filename": "en_US-lessac-low.onnx.json",
+        "filename": "en_US-ryan-medium.onnx.json",
         "min_bytes": 500,
         "urls": [
-            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/low/en_US-lessac-low.onnx.json",
-            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx.json",
+            "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json",
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json",
         ],
     },
 ]
@@ -144,6 +151,11 @@ def main() -> None:
         help="With --stt, download ggml-tiny.bin instead of ggml-base.bin",
     )
     parser.add_argument(
+        "--stt-small",
+        action="store_true",
+        help="With --stt, download ggml-small.bin (better Bangla; uses more RAM)",
+    )
+    parser.add_argument(
         "--tts",
         action="store_true",
         help="Download the Piper English voice instead of the LLM",
@@ -152,7 +164,12 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.stt:
-        spec = STT_MODELS["tiny"] if args.tiny else STT_MODELS["base"]
+        if args.tiny:
+            spec = STT_MODELS["tiny"]
+        elif args.stt_small:
+            spec = STT_MODELS["small"]
+        else:
+            spec = STT_MODELS["base"]
         dest = STT_DIR / spec["filename"]
         if _already_present(dest, spec["min_bytes"], args.force):
             return
