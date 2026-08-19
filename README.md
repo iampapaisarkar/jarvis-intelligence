@@ -19,7 +19,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issue
 | RAM | 8 GB (close other heavy apps while the model is loaded) |
 | GPU | Not required. Do not assume CUDA. |
 | Python | **3.11, 3.12, or 3.13** (64-bit). Avoid 3.14 until llama-cpp-python ships wheels for it. |
-| Disk | ~2.3 GB for the 1.5B GGUF + Whisper `ggml-base.bin` + Piper ONNX plus the Python venv |
+| Disk | ~2.3 GB for the 1.5B GGUF + Whisper + Piper, or ~6 GB if you use the 7B GGUF, plus the Python venv |
 
 Optional build tools (only if `pip` has to compile `llama-cpp-python`):
 
@@ -80,26 +80,41 @@ pip install llama-cpp-python --force-reinstall --no-cache-dir
 
 ### 4. Download the GGUF model (needs internet once)
 
-Default model: **Qwen2.5 1.5B Instruct, Q4_K_M** (~1.0 GB).
+Accuracy option (slower on 8 GB CPU): **Qwen2.5 7B Instruct, Q4_K_M** (~4.7 GB).
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python scripts\download_model.py
+python scripts\download_model.py --7b
 ```
 
 This writes:
 
 ```
-models\llm\qwen2.5-1.5b-instruct-q4_k_m.gguf
+models\llm\qwen2.5-7b-instruct-q4_k_m.gguf
 ```
 
-If 8 GB RAM is too tight, use the 0.5B variant:
+Then set in `.env`:
+
+```
+LLM_MODEL_PATH=models/llm/qwen2.5-7b-instruct-q4_k_m.gguf
+LLM_N_BATCH=128
+```
+
+Close other heavy apps. First reply after load can take a long time. If Windows starts swapping badly, fall back to 1.5B:
+
+```powershell
+python scripts\download_model.py
+```
+
+```
+LLM_MODEL_PATH=models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
+```
+
+If 8 GB RAM is too tight even for 1.5B, use the 0.5B variant:
 
 ```powershell
 python scripts\download_model.py --small
 ```
-
-Then set in `.env`:
 
 ```
 LLM_MODEL_PATH=models/llm/qwen2.5-0.5b-instruct-q4_k_m.gguf
@@ -162,7 +177,7 @@ Edit `.env` (never commit it):
 JARVIS_HOST=0.0.0.0
 JARVIS_PORT=8765
 JARVIS_AUTH_TOKEN=change-me-to-a-long-random-string
-LLM_MODEL_PATH=models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf
+LLM_MODEL_PATH=models/llm/qwen2.5-7b-instruct-q4_k_m.gguf
 STT_MODEL_PATH=models/stt/ggml-base.bin
 TTS_MODEL_PATH=models/tts/en_US-ryan-medium.onnx
 LOG_LEVEL=INFO
@@ -319,7 +334,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python scripts/download_model.py
+python scripts/download_model.py --7b
 python scripts/download_model.py --stt
 python scripts/download_model.py --tts
 python -m uvicorn server.main:app --host 127.0.0.1 --port 8765

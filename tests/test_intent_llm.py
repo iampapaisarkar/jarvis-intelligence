@@ -8,6 +8,7 @@ from server.config import REPO_ROOT, Settings
 from server.tools.catalog import default_registry
 
 CANDIDATES = [
+    REPO_ROOT / "models" / "llm" / "qwen2.5-7b-instruct-q4_k_m.gguf",
     REPO_ROOT / "models" / "llm" / "qwen2.5-1.5b-instruct-q4_k_m.gguf",
     REPO_ROOT / "models" / "llm" / "qwen2.5-0.5b-instruct-q4_k_m.gguf",
     REPO_ROOT / "models" / "llm" / "model.gguf",

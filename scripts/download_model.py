@@ -15,6 +15,14 @@ STT_DIR = REPO_ROOT / "models" / "stt"
 TTS_DIR = REPO_ROOT / "models" / "tts"
 
 MODELS = {
+    "7b": {
+        "filename": "qwen2.5-7b-instruct-q4_k_m.gguf",
+        "min_bytes": 3_000_000_000,
+        "urls": [
+            "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+            "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf",
+        ],
+    },
     "1.5b": {
         "filename": "qwen2.5-1.5b-instruct-q4_k_m.gguf",
         "min_bytes": 10_000_000,
@@ -136,6 +144,12 @@ def _already_present(dest: Path, min_bytes: int, force: bool) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download local models for Jarvis")
     parser.add_argument(
+        "--7b",
+        dest="seven_b",
+        action="store_true",
+        help="Download Qwen2.5 7B Q4_K_M (~4.7 GB). Smarter, much slower on 8 GB CPU.",
+    )
+    parser.add_argument(
         "--small",
         action="store_true",
         help="Download Qwen2.5 0.5B Q4_K_M instead of 1.5B (less RAM)",
@@ -184,7 +198,14 @@ def main() -> None:
             download(spec["urls"], dest, spec["min_bytes"])
         return
 
-    spec = MODELS["0.5b"] if args.small else MODELS["1.5b"]
+    if args.seven_b and args.small:
+        raise SystemExit("Use only one of --7b or --small.")
+    if args.seven_b:
+        spec = MODELS["7b"]
+    elif args.small:
+        spec = MODELS["0.5b"]
+    else:
+        spec = MODELS["1.5b"]
     dest = LLM_DIR / spec["filename"]
     if _already_present(dest, spec["min_bytes"], args.force):
         return

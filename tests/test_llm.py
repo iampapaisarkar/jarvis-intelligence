@@ -7,6 +7,7 @@ from server.ai.prompts import JARVIS_SYSTEM_PROMPT
 from server.config import REPO_ROOT, Settings
 
 CANDIDATES = [
+    REPO_ROOT / "models" / "llm" / "qwen2.5-7b-instruct-q4_k_m.gguf",
     REPO_ROOT / "models" / "llm" / "qwen2.5-1.5b-instruct-q4_k_m.gguf",
     REPO_ROOT / "models" / "llm" / "qwen2.5-0.5b-instruct-q4_k_m.gguf",
     REPO_ROOT / "models" / "llm" / "model.gguf",

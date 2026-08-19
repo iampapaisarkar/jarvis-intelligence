@@ -28,7 +28,7 @@ New-Item -ItemType Directory -Force -Path models\llm, models\stt, models\tts, lo
 Write-Host ""
 Write-Host "Next:"
 Write-Host "  1. .\.venv\Scripts\Activate.ps1"
-Write-Host "  2. python scripts\download_model.py"
+Write-Host "  2. python scripts\download_model.py --7b"
 Write-Host "  3. python scripts\download_model.py --stt"
 Write-Host "  4. python scripts\download_model.py --tts"
 Write-Host "  5. .\scripts\start_server.ps1"
