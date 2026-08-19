@@ -23,6 +23,9 @@ class FakeLLM:
     is_loaded: bool = False
     fail_with: Optional[Exception] = None
     last_messages: Optional[list[ChatTurn]] = None
+    last_json_mode: bool = False
+    replies: Optional[list[str]] = None
+    call_count: int = 0
 
     backend_name: str = "fake"
     model_path: str = "/tmp/fake-model.gguf"
@@ -50,13 +53,19 @@ class FakeLLM:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         session_id: str = "-",
+        json_mode: bool = False,
     ) -> LLMResult:
         self.last_messages = messages
+        self.last_json_mode = json_mode
         self.is_loaded = True
         if self.fail_with is not None:
             raise self.fail_with
+        text = self.reply
+        if self.replies:
+            text = self.replies[min(self.call_count, len(self.replies) - 1)]
+        self.call_count += 1
         return LLMResult(
-            text=self.reply,
+            text=text,
             model_path=self.model_path,
             prompt_tokens=10,
             completion_tokens=5,

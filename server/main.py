@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from server import __version__
 from server.api.health import router as health_router
+from server.api.intent import router as intent_router
 from server.api.routes import router as chat_router
 from server.api.speech import router as speech_router
 from server.api.tts import router as tts_router
@@ -15,7 +16,7 @@ from server.ai.llm import LLMError
 from server.ai.stt import STTError
 from server.ai.tts import TTSError
 from server.config import get_settings
-from server.dependencies import get_llm_engine, get_stt_engine, get_tts_engine
+from server.dependencies import get_llm_engine, get_stt_engine, get_tool_registry, get_tts_engine
 from server.utils.logger import get_logger, setup_logging
 
 logger = get_logger("jarvis.server")
@@ -28,13 +29,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     llm = get_llm_engine()
     stt = get_stt_engine()
     tts = get_tts_engine()
+    registry = get_tool_registry()
     logger.info(
-        "Jarvis Phase 3 starting host=%s port=%s llm=%s stt=%s tts=%s",
+        "Jarvis Phase 4 starting host=%s port=%s llm=%s stt=%s tts=%s tools=%s",
         settings.jarvis_host,
         settings.jarvis_port,
         settings.model_file,
         settings.stt_model_file,
         settings.tts_model_file,
+        len(registry),
     )
     if settings.llm_preload:
         try:
@@ -61,7 +64,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     application = FastAPI(
         title="Jarvis",
-        description="Local offline personal assistant brain (Phase 3: LLM + STT + TTS)",
+        description="Local offline personal assistant brain (Phase 4: LLM + STT + TTS + intent)",
         version=__version__,
         lifespan=lifespan,
         docs_url="/docs",
@@ -71,6 +74,7 @@ def create_app() -> FastAPI:
     application.include_router(chat_router)
     application.include_router(speech_router)
     application.include_router(tts_router)
+    application.include_router(intent_router)
 
     @application.exception_handler(LLMError)
     async def llm_error_handler(_request, exc: LLMError) -> JSONResponse:

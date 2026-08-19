@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,11 @@ class LlmHealth(ModelHealth):
     n_gpu_layers: int
 
 
+class ToolsHealth(BaseModel):
+    registered: int
+    execution: Literal["disabled"] = "disabled"
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     version: str
@@ -24,6 +29,7 @@ class HealthResponse(BaseModel):
     llm: LlmHealth
     stt: ModelHealth
     tts: ModelHealth
+    tools: ToolsHealth
 
 
 class ChatMessage(BaseModel):
@@ -86,6 +92,44 @@ class SpeakRequest(BaseModel):
     language: Optional[str] = Field(default=None, max_length=16)
     session_id: Optional[str] = Field(default=None, max_length=128)
     play: bool = False
+
+
+class IntentRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    session_id: Optional[str] = Field(default=None, max_length=128)
+    target: Optional[Literal["windows", "mac"]] = None
+
+
+class IntentResponse(BaseModel):
+    type: Literal["tool_call", "clarification", "reply"]
+    executed: bool = False
+    message: str
+    spoken_reply: str
+    session_id: str
+    tool: Optional[str] = None
+    target: Optional[Literal["windows", "mac"]] = None
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    risk: Optional[Literal["low", "medium", "high"]] = None
+    requires_confirmation: Optional[bool] = None
+    model: str = ""
+    usage: TokenUsage
+    latency_ms: float = 0.0
+    parse_recovered: bool = False
+
+
+class ToolListItem(BaseModel):
+    name: str
+    description: str
+    targets: list[str]
+    risk: str
+    requires_confirmation: bool
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    required: list[str] = Field(default_factory=list)
+
+
+class ToolListResponse(BaseModel):
+    execution: Literal["disabled"] = "disabled"
+    tools: list[ToolListItem]
 
 
 class ErrorBody(BaseModel):

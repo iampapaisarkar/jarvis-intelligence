@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     jarvis_host: str = "0.0.0.0"
     jarvis_port: int = 8765
     jarvis_auth_token: str = "change-me"
+    jarvis_default_target: str = "windows"
 
     llm_model_path: Path = Path("models/llm/qwen2.5-1.5b-instruct-q4_k_m.gguf")
     llm_chat_format: str = "chatml"
@@ -50,8 +51,20 @@ class Settings(BaseSettings):
     tts_use_cuda: bool = False
     tts_max_chars: int = 500
 
+    intent_max_tokens: int = 192
+    intent_temperature: float = 0.1
+    intent_json_retries: int = 1
+
     log_level: str = "INFO"
     log_dir: Path = Path("logs")
+
+    @field_validator("jarvis_default_target")
+    @classmethod
+    def _default_target(cls, value: str) -> str:
+        lower = value.strip().lower()
+        if lower not in {"windows", "mac"}:
+            raise ValueError("JARVIS_DEFAULT_TARGET must be windows or mac")
+        return lower
 
     @field_validator("llm_n_ctx")
     @classmethod
@@ -88,6 +101,20 @@ class Settings(BaseSettings):
     def _tts_chars(cls, value: int) -> int:
         if value < 1 or value > 2000:
             raise ValueError("TTS_MAX_CHARS must be between 1 and 2000")
+        return value
+
+    @field_validator("intent_max_tokens")
+    @classmethod
+    def _intent_tokens(cls, value: int) -> int:
+        if value < 32 or value > 512:
+            raise ValueError("INTENT_MAX_TOKENS must be between 32 and 512")
+        return value
+
+    @field_validator("intent_json_retries")
+    @classmethod
+    def _intent_retries(cls, value: int) -> int:
+        if value < 0 or value > 2:
+            raise ValueError("INTENT_JSON_RETRIES must be between 0 and 2")
         return value
 
     def resolve_path(self, path: Path) -> Path:

@@ -4,7 +4,7 @@ Local, offline personal voice assistant. The AI brain runs on a Windows laptop (
 
 **No cloud AI APIs.** After models and dependencies are installed, Jarvis can run with the internet disabled.
 
-Current milestone: **Phase 3** — local LLM + Whisper STT + Piper TTS.
+Current milestone: **Phase 4** — local LLM + Whisper STT + Piper TTS + structured intent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, Phase 1 issues, and remaining phases.
 
@@ -232,6 +232,24 @@ curl -X POST http://127.0.0.1:8765/v1/speak `
   --output jarvis.wav
 ```
 
+### 8d. Parse an intent (no OS execution)
+
+```powershell
+curl -X POST http://127.0.0.1:8765/v1/intent `
+  -H "Content-Type: application/json" `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string" `
+  -d "{\"text\":\"VS Code ta open kore dao.\",\"target\":\"mac\"}"
+```
+
+`executed` is always `false` in Phase 4. Safety and real Windows/Mac tools start in later phases.
+
+List the catalog:
+
+```powershell
+curl http://127.0.0.1:8765/v1/tools `
+  -H "X-Jarvis-Token: change-me-to-a-long-random-string"
+```
+
 ### 9. Tests
 
 ```powershell
@@ -265,15 +283,17 @@ python -m pytest tests -q
 
 ---
 
-## API (Phase 3)
+## API (Phase 4)
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/health` | no | LLM + STT + TTS file/load state |
+| GET | `/health` | no | LLM + STT + TTS + tool catalog state |
 | POST | `/v1/chat` | token | Local chat completion |
 | POST | `/v1/transcribe` | token | WAV → transcript (whisper.cpp) |
 | POST | `/v1/listen` | token | Microphone capture → transcript |
 | POST | `/v1/speak` | token | Text → WAV (Piper / espeak-ng) |
+| POST | `/v1/intent` | token | Text → validated tool plan (not executed) |
+| GET | `/v1/tools` | token | Registered tool schemas |
 
 `POST /v1/chat` body:
 
@@ -302,7 +322,7 @@ scripts/    Windows setup / start / health
 tests/      Unit + integration tests
 ```
 
-STT, TTS, tools, safety, Mac client, and memory beyond speech I/O are documented in ARCHITECTURE.md. Intent/tools start in Phase 4.
+STT, TTS, and intent planning are implemented. Safety, OS tool execution, Mac client, and memory are documented in ARCHITECTURE.md.
 
 ---
 

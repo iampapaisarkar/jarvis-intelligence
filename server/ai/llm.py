@@ -73,6 +73,7 @@ class LLMEngine(Protocol):
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         session_id: str = "-",
+        json_mode: bool = False,
     ) -> LLMResult: ...
 
 
@@ -173,6 +174,7 @@ class LlamaCppEngine:
         max_tokens: Optional[int],
         temperature: Optional[float],
         session_id: str,
+        json_mode: bool,
     ) -> LLMResult:
         self.load()
         assert self._llama is not None
@@ -182,18 +184,22 @@ class LlamaCppEngine:
 
         extra = {"session_id": session_id}
         logger.info(
-            "LLM generate messages=%s max_tokens=%s temperature=%s",
+            "LLM generate messages=%s max_tokens=%s temperature=%s json_mode=%s",
             len(payload),
             max_out,
             temp,
+            json_mode,
             extra=extra,
         )
         started = time.perf_counter()
-        completion = self._llama.create_chat_completion(
-            messages=payload,
-            max_tokens=max_out,
-            temperature=temp,
-        )
+        kwargs: dict[str, Any] = {
+            "messages": payload,
+            "max_tokens": max_out,
+            "temperature": temp,
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        completion = self._llama.create_chat_completion(**kwargs)
         latency_ms = (time.perf_counter() - started) * 1000
         choice = completion["choices"][0]
         text = (choice.get("message") or {}).get("content") or ""
@@ -223,9 +229,12 @@ class LlamaCppEngine:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         session_id: str = "-",
+        json_mode: bool = False,
     ) -> LLMResult:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             self._executor,
-            lambda: self._generate_sync(messages, max_tokens, temperature, session_id),
+            lambda: self._generate_sync(
+                messages, max_tokens, temperature, session_id, json_mode
+            ),
         )

@@ -172,7 +172,7 @@ Structured local logs: timestamp, session, transcript, intent, tool, arguments, 
 | **1** | Python FastAPI server, llama.cpp, GGUF load, `/health`, `/v1/chat`, config, logging | **complete** (see issues below) |
 | **2** | Local STT (whisper.cpp), microphone/audio input, `/v1/transcribe`, `/v1/listen` | **complete** (see issues below) |
 | **3** | Local TTS (Piper), `/v1/speak`, optional speaker playback | **complete** (see issues below) |
-| 4 | Intent parser, tool registry, structured tool calls | not started |
+| **4** | Intent parser, tool registry, structured tool calls | **this milestone** |
 | 5 | Safety engine, risk levels, confirmation, command policy | not started |
 | 6 | Windows tools (apps, filesystem, safe terminal) | not started |
 | 7 | Mac client (WebSocket, auth, macOS tool executor) | not started |
@@ -248,12 +248,36 @@ Verified on macOS arm64 / Python 3.12: English `POST /v1/speak` returned a Piper
 5. **Do not load Piper, Whisper, and the LLM at once on 8 GB if the machine swaps.** All three are lazy-loaded independently.
 6. **WAV out only.** `/v1/speak` returns PCM WAV. The Mac client (Phase 7) can play that locally.
 
+## Phase 4 detail
+
+Phase 4 proves the brain can plan actions without executing them:
+
+1. `ToolRegistry` is the only catalog of names the LLM may emit.
+2. Each tool declares schema, allowed targets (`windows` | `mac`), risk, and confirmation. `execute()` raises until Phase 6.
+3. `IntentParser` asks the local GGUF for JSON (`tool_call` | `clarification` | `reply`), extracts an object even if the model wraps it, and validates arguments against the registry.
+4. Risk and `requires_confirmation` come from the registry, never from the model.
+5. `POST /v1/intent` returns a validated plan with `executed: false`. `GET /v1/tools` lists the catalog.
+6. Default tools: `open_application`, `list_directory`, `get_system_info`, `create_folder`, `create_file`. No shell, no delete.
+
+## Phase 4 issues (open)
+
+Verified on macOS arm64 / Python 3.12: 65 tests passed. Live `POST /v1/intent` for `"VS Code ta open kore dao."` with `target: mac` returned `open_application` / Visual Studio Code / `mac` with `executed: false` (~4.7 s including GGUF load). Health reports 5 registered tools and `execution: disabled`.
+
+1. **Plans only.** Nothing opens apps or touches the filesystem yet. Phase 5 adds safety; Phase 6/7 execute.
+2. **1.5B JSON quality varies.** Intent uses `json_mode` and one retry. Ambiguous speech may become a clarification instead of a tool call.
+3. **No delete or terminal tools.** Those wait for the safety engine so the model cannot name them.
+4. **Not proven on the Windows i3.**
+5. **Caller `target` wins.** If `POST /v1/intent` sets `"target":"mac"`, that overrides the model's target. Otherwise the model target is used, then `JARVIS_DEFAULT_TARGET` (windows).
+
 
 ## Runtime layout (target)
 
 ```
 JARVIS/
 ├── server/          # Windows brain (FastAPI)
+│   ├── ai/          # LLM, STT, TTS, intent parser
+│   ├── tools/       # registry + schemas (no OS execution in Phase 4)
+│   └── api/
 ├── mac-client/      # macOS body (Phase 7+)
 ├── models/          # local GGUF / Whisper / Piper files (gitignored binaries)
 ├── scripts/         # Windows setup and health

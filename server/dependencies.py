@@ -4,10 +4,13 @@ from functools import lru_cache
 
 from fastapi import Depends
 
+from server.ai.intent import IntentParser
 from server.ai.llm import LLMEngine, LlamaCppEngine
 from server.ai.stt import SpeechToText, WhisperCppSTT
 from server.ai.tts import PiperTTS, TextToSpeech
 from server.config import Settings, get_settings
+from server.tools.catalog import default_registry
+from server.tools.registry import ToolRegistry
 
 
 @lru_cache
@@ -26,6 +29,19 @@ def get_stt_engine() -> WhisperCppSTT:
 def get_tts_engine() -> PiperTTS:
     """Process-wide singleton. Do not construct a second Piper instance."""
     return PiperTTS(get_settings())
+
+
+@lru_cache
+def get_tool_registry() -> ToolRegistry:
+    return default_registry()
+
+
+def get_intent_parser(
+    engine: LLMEngine = Depends(get_llm_engine),
+    registry: ToolRegistry = Depends(get_tool_registry),
+    settings: Settings = Depends(get_settings),
+) -> IntentParser:
+    return IntentParser(engine, registry, settings)
 
 
 def llm_engine_dep(engine: LLMEngine = Depends(get_llm_engine)) -> LLMEngine:
@@ -48,4 +64,5 @@ def reset_singletons() -> None:
     get_llm_engine.cache_clear()
     get_stt_engine.cache_clear()
     get_tts_engine.cache_clear()
+    get_tool_registry.cache_clear()
     get_settings.cache_clear()

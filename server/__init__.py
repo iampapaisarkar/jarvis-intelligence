@@ -1,3 +1,3 @@
-"""Jarvis Phase 3 — local offline LLM + STT + TTS server."""
+"""Jarvis Phase 4 — local offline LLM + STT + TTS + intent server."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

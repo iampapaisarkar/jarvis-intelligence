@@ -4,9 +4,10 @@ from server import __version__
 from server.ai.llm import LLMEngine
 from server.ai.stt import SpeechToText
 from server.ai.tts import TextToSpeech
-from server.api.schemas import HealthResponse, LlmHealth, ModelHealth
+from server.api.schemas import HealthResponse, LlmHealth, ModelHealth, ToolsHealth
 from server.config import Settings, get_settings
-from server.dependencies import get_llm_engine, get_stt_engine, get_tts_engine
+from server.dependencies import get_llm_engine, get_stt_engine, get_tts_engine, get_tool_registry
+from server.tools.registry import ToolRegistry
 
 router = APIRouter(tags=["health"])
 
@@ -17,6 +18,7 @@ async def health(
     llm: LLMEngine = Depends(get_llm_engine),
     stt: SpeechToText = Depends(get_stt_engine),
     tts: TextToSpeech = Depends(get_tts_engine),
+    registry: ToolRegistry = Depends(get_tool_registry),
 ) -> HealthResponse:
     llm_present = llm.model_file_present()
     stt_present = stt.model_file_present()
@@ -45,4 +47,5 @@ async def health(
             model_file_present=tts_present,
             model_loaded=tts.loaded,
         ),
+        tools=ToolsHealth(registered=len(registry), execution="disabled"),
     )
